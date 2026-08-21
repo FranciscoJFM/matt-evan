@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mattEvan - Personalizamos tus ideas</title>
+    <meta name="description"
+        content="mattEvan: Productos personalizados, oportunidades de garage y próximamente impresión, copias, escaneo y papelería.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="assets/Logo.png">
+</head>
+
+<body>
+    <!-- Cursor Glow Effect -->
+    <div class="cursor-glow"></div>
+
+    <!-- Navbar -->
+    <nav id="navbar">
+        <div class="nav-container">
+            <div class="logo-container">
+                <div class="nav-logo-wrapper">
+                    <img src="assets/Logo.png" alt="mattEvan Logo" class="nav-logo">
+                </div>
+                <span class="nav-title">mattEvan</span>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#hero">Inicio</a></li>
+                <li><a href="#catalog">Catálogo</a></li>
+                <li><a href="#services">Servicios</a></li>
+                <li><a href="#gallery">Galería</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="#contact">Contacto</a></li>
+            </ul>
+            <div class="hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header id="hero">
+        <div class="hero-content reveal">
+            <div class="hero-mascot-wrapper">
+                <img src="assets/Logo.png" alt="mattEvan Mascot" class="hero-mascot">
+            </div>
+            <h1>Bienvenido a <span class="gradient-text">mattEvan</span></h1>
+            <h2 class="typewriter-container"><span id="typewriter">Personalizamos tus ideas.</span><span
+                    class="cursor">|</span></h2>
+            <p>Productos personalizados, oportunidades de garage, impresiones, copias y escaneo. Próximamente papelería.
+            </p>
+            <div class="hero-buttons">
+                <a href="#catalog" class="btn btn-primary">Ver Productos</a>
+                <a href="#contact" class="btn btn-secondary">Cotizar por WhatsApp</a>
+            </div>
+        </div>
+        <div class="hero-bg-shapes">
+            <div class="shape shape-1"></div>
+            <div class="shape shape-2"></div>
+            <div class="shape shape-3"></div>
+        </div>
+    </header>
+
+    <!-- Novedades (What's new) -->
+    <section id="novedades" class="section bg-alt">
+        <div class="container">
+            <h2 class="section-title reveal">🆕 Esta semana en mattEvan</h2>
+            <div class="novedades-grid reveal">
+                <div class="novedad-card">
+                    <h4>Nuevos productos de garage</h4>
+                    <p>Consolas, juegos y más tesoros retro acaban de llegar.</p>
+                </div>
+                <div class="novedad-card">
+                    <h4>Promoción en personalizados</h4>
+                    <p>10% de descuento en pedidos de más de 5 tazas.</p>
+                </div>
+                <div class="novedad-card highlight">
+                    <h4>Próximamente</h4>
+                    <p>Artículos de papelería y útiles escolares.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Catalog (Garage) Section -->
+    <section id="catalog" class="section">
+        <div class="container">
+            <h2 class="section-title reveal">🔥 Disponible Ahora</h2>
+
+            <div class="filters reveal">
+                <button class="filter-btn active" data-filter="all">Todos</button>
+                <button class="filter-btn" data-filter="garage">Garage / Bazar</button>
+                <button class="filter-btn" data-filter="custom">Personalizados</button>
+            </div>
+
+            <!-- Dynamic grid populated via JS -->
+            <div class="catalog-grid" id="catalog-container">
+                <!-- Products will be injected here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" class="section bg-alt">
+        <div class="container">
+            <h2 class="section-title reveal">Nuestros Servicios</h2>
+            <div class="services-grid">
+                <!-- Bloque 1 -->
+                <div class="service-card reveal">
+                    <div class="service-icon">🎁</div>
+                    <h3>Personalizados</h3>
+                    <p>Tazas, playeras, cajas, stickers y más, con tu propio diseño único.</p>
+                </div>
+                <!-- Bloque 2 -->
+                <div class="service-card reveal">
+                    <div class="service-icon">🏷️</div>
+                    <h3>Garage & Bazar</h3>
+                    <p>Electrónica retro, juguetes, y artículos únicos listos para una segunda vida.</p>
+                </div>
+                <!-- Bloque 3 -->
+                <div class="service-card reveal">
+                    <div class="service-icon">🖨️</div>
+                    <h3>Impresiones & Copias</h3>
+                    <p>Copias, escáner, e impresiones a color. ¡Próximamente papelería!</p>
+                </div>
+            </div>
+
+            <div class="other-services reveal">
+                <h4>Otros servicios:</h4>
+                <p>💻 <strong>Desarrollo Web:</strong> Landing pages rápidas y modernas para negocios (como esta
+                    página).</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Galería -->
+    <section id="gallery" class="section">
+        <div class="container">
+            <h2 class="section-title reveal">📸 Trabajos Reales</h2>
+            <p class="section-subtitle reveal">Un vistazo a lo que hemos creado para nuestros clientes.</p>
+            <div class="gallery-grid reveal">
+                <!-- Placeholders (replace with real images later) -->
+                <div class="gallery-item"><img src="assets/Tazas.jpg" alt="Trabajo 1"></div>
+                <div class="gallery-item"><img src="assets/Playeras.jpg" alt="Trabajo 2"></div>
+                <div class="gallery-item"><img src="assets/Etiquetas.jpg" alt="Trabajo 3"></div>
+                <div class="gallery-item"><img src="assets/Cajas.jpg" alt="Trabajo 4"></div>
+                <div class="gallery-item"><img src="assets/Llavero.jpg" alt="Trabajo 5"></div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Así trabajamos -->
+    <section id="how-we-work" class="section bg-alt">
+        <div class="container">
+            <h2 class="section-title reveal">🛠️ Así Trabajamos</h2>
+            <div class="steps-container reveal">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Cuéntanos qué necesitas</h3>
+                    <p>Mándanos un WhatsApp con tu idea o lo que buscas del catálogo.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>Te cotizamos</h3>
+                    <p>Acordamos detalles, precios y tiempos de entrega sin compromiso.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Lo preparamos</h3>
+                    <p>Diseñamos, imprimimos o empacamos tu pedido para entregártelo.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Promociones (Banner) -->
+    <section id="promotions" class="section">
+        <div class="container">
+            <div class="promo-banner reveal">
+                <div class="promo-content">
+                    <h3>💼 ¿Buscas empleo?</h3>
+                    <p>Tu primera impresión de CV va por nuestra cuenta.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonios -->
+    <section id="testimonials" class="section bg-alt">
+        <div class="container">
+            <h2 class="section-title reveal">⭐ Lo que dicen nuestros clientes</h2>
+            <div class="testimonials-grid reveal">
+                <div class="testimonial-card">
+                    <div class="stars">⭐⭐⭐⭐⭐</div>
+                    <p>"Quedaron muy bonitas las cajas y estuvieron listas a tiempo."</p>
+                    <span>- Cliente Satisfecho</span>
+                </div>
+                <!-- Añadir más testimonios conforme lleguen -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Ubicación y Entregas -->
+    <section id="location" class="section">
+        <div class="container">
+            <h2 class="section-title reveal">📍 Entregas y Ubicación</h2>
+            <div class="location-content reveal">
+                <ul class="delivery-list">
+                    <li>🚗 <strong>Entrega Acordada:</strong> Entregas en puntos medios o pasar a recoger.</li>
+                    <li>📦 <strong>Envíos:</strong> Nacionales según el producto (consulta por WhatsApp).</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section id="faq" class="section bg-alt">
+        <div class="container">
+            <h2 class="section-title reveal">Preguntas Frecuentes</h2>
+            <div class="faq-container reveal">
+                <div class="faq-item">
+                    <button class="faq-question">
+                        ¿Hacen envíos a domicilio?
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Sí, realizamos entregas en puntos acordados, envíos locales y nacionales por paquetería.
+                            Consulta costos por WhatsApp.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        ¿Cuánto tiempo tarda un pedido personalizado?
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Los tiempos varían dependiendo del producto y la cantidad. Generalmente, los pedidos de tazas
+                            o playeras están listos entre 2 y 4 días hábiles una vez confirmado el diseño.</p>
+                    </div>
+                </div>
+                <div class="faq-item">
+                    <button class="faq-question">
+                        ¿Qué métodos de pago aceptan?
+                        <span class="faq-icon">+</span>
+                    </button>
+                    <div class="faq-answer">
+                        <p>Aceptamos transferencias bancarias, depósitos en OXXO y pagos en efectivo si la entrega es en
+                            persona.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="section">
+        <div class="container">
+            <h2 class="section-title reveal">Contáctanos</h2>
+            <div class="contact-wrapper">
+                <form id="contact-form" class="glass-form reveal">
+                    <div class="form-group">
+                        <label for="name">Tu Nombre</label>
+                        <input type="text" id="name" required placeholder="Ej. Ana Pérez">
+                    </div>
+                    <div class="form-group">
+                        <label for="service">¿Qué te interesa?</label>
+                        <select id="service" required>
+                            <option value="">Selecciona una opción...</option>
+                            <option value="Catálogo/Garage">Catálogo / Venta de Garage</option>
+                            <option value="Productos Personalizados">Productos Personalizados</option>
+                            <option value="Impresiones/Copias">Impresiones / Copias</option>
+                            <option value="Paginas Web">Creación de Páginas Web</option>
+                            <option value="Otro">Otro / Duda general</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Mensaje</label>
+                        <textarea id="message" rows="4" required placeholder="Cuéntanos los detalles..."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Enviar a WhatsApp 💬</button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-content">
+            <div class="footer-logo">
+                <span class="nav-title">mattEvan</span>
+            </div>
+            <p class="footer-tagline">Personalizamos tus ideas.</p>
+            <p class="footer-pillars">Productos personalizados · Garage · Impresión · Papelería</p>
+
+            <div class="footer-links">
+                <a href="#hero">Inicio</a>
+                <a href="#catalog">Catálogo</a>
+                <a href="#services">Servicios</a>
+            </div>
+
+            <div class="social-links">
+                <a href="https://wa.me/525614429971" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                <a href="#" id="instagram-link" target="_blank" rel="noopener noreferrer">Facebook</a>
+            </div>
+            <p class="footer-copy">&copy; <span id="year"></span> mattEvan. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">Mensaje aquí</div>
+
+    <!-- WhatsApp Floating Button -->
+    <a href="https://wa.me/525614429971" target="_blank" class="whatsapp-float" aria-label="Chat on WhatsApp">
+        <svg viewBox="0 0 32 32" width="35" height="35" fill="currentColor">
+            <path
+                d="M16.05 1C7.76 1 1.05 7.72 1.05 16.01c0 2.65.69 5.23 2 7.51L1 31l7.65-2.01c2.2.1.3 4.7 6.94 4.7 8.29 0 15-6.72 15-15.01C31.05 7.72 24.34 1 16.05 1zm0 28.5c-2.25 0-4.45-.6-6.38-1.74l-.45-.27-4.73 1.24 1.26-4.61-.29-.47C4.24 21.6 3.55 18.85 3.55 16c0-6.9 5.61-12.5 12.5-12.5s12.5 5.6 12.5 12.5-5.61 12.5-12.5 12.5zM22.9 20.3c-.38-.19-2.22-1.1-2.56-1.22-.34-.13-.59-.19-.84.19-.25.38-.97 1.22-1.19 1.47-.22.25-.44.28-.81.1-1.63-.82-3.1-1.89-4.22-3.07-.63-.67-1.1-1.46-1.43-2.31-.06-.17.13-.26.31-.44.17-.18.38-.44.56-.66.19-.22.25-.38.38-.63.13-.25.06-.47-.03-.66-.09-.19-.84-2.03-1.16-2.78-.31-.72-.62-.62-.84-.63h-.72c-.25 0-.66.09-1 .47-.34.38-1.31 1.28-1.31 3.13s1.34 3.63 1.53 3.88c.19.25 2.63 4.19 6.47 5.75 2.13.88 3.03.97 4.13.81 1.34-.19 2.22-.91 2.53-1.78.31-.88.31-1.63.22-1.78-.09-.16-.34-.25-.72-.44z" />
+        </svg>
+    </a>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

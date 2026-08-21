@@ -1,0 +1,26 @@
+[
+  {
+    "id": "garage-wii",
+    "nombre": "Nintendo Wii",
+    "precio": 900,
+    "estado": "Disponible",
+    "categoria": "garage",
+    "imagen": "assets/product-console.png"
+  },
+  {
+    "id": "custom-playera",
+    "nombre": "Playera Personalizada",
+    "precio": 200,
+    "estado": "Disponible",
+    "categoria": "custom",
+    "imagen": "assets/product-mug.png"
+  },
+  {
+    "id": "garage-juguete",
+    "nombre": "Juguete Vintage",
+    "precio": 120,
+    "estado": "Vendido",
+    "categoria": "garage",
+    "imagen": "assets/product-console.png"
+  }
+]
