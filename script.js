@@ -1,22 +1,39 @@
-// Configuración
-const CONFIG = {
-    WHATSAPP_NUMBER: "525614429971", // Reemplazar con número real
-    INSTAGRAM_URL: "https://www.facebook.com/MattEvan87/", // Reemplazar con Instagram real
+// Firebase imports
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, collection, getDocs, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+// Firebase Config
+const firebaseConfig = {
+    apiKey: "AIzaSyBpEFLhubbnSpy5W3ziUpovZC-KN8RYtWQ",
+    authDomain: "mattevan-6c73f.firebaseapp.com",
+    projectId: "mattevan-6c73f",
+    storageBucket: "mattevan-6c73f.firebasestorage.app",
+    messagingSenderId: "785204146637",
+    appId: "1:785204146637:web:75a4648870853886081484"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// Configuración por defecto (se sobreescribe con Firebase)
+let CONFIG = {
+    WHATSAPP_NUMBER: "525614429971",
+    FACEBOOK_URL: "https://www.facebook.com/MattEvan87/",
+    INSTAGRAM_URL: "",
 };
 
 // Utilidades
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
 
-// Toast
 function showToast(message) {
     const toast = $("#toast");
+    if (!toast) return;
     toast.textContent = message;
     toast.classList.add("show");
     setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
-// WhatsApp URL Builder
 function buildWhatsappUrl(text) {
     return `https://wa.me/${CONFIG.WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
 }
@@ -24,60 +41,108 @@ function buildWhatsappUrl(text) {
 // Mobile Menu
 const hamburger = $(".hamburger");
 const navLinks = $(".nav-links");
-
-hamburger.addEventListener("click", () => {
-    navLinks.classList.toggle("active");
-});
-
-// Close menu on click
+if (hamburger) {
+    hamburger.addEventListener("click", () => navLinks.classList.toggle("active"));
+}
 $$(".nav-links a").forEach(link => {
-    link.addEventListener("click", () => {
-        navLinks.classList.remove("active");
-    });
+    link.addEventListener("click", () => navLinks.classList.remove("active"));
 });
 
-// Navbar scroll effect
+// Navbar scroll
 window.addEventListener("scroll", () => {
     const navbar = $("#navbar");
-    if (window.scrollY > 50) {
-        navbar.style.background = "rgba(5, 8, 15, 0.95)";
-    } else {
-        navbar.style.background = "rgba(10, 15, 26, 0.8)";
-    }
+    if (!navbar) return;
+    navbar.style.background = window.scrollY > 50 ? "rgba(5, 8, 15, 0.95)" : "rgba(10, 15, 26, 0.8)";
 });
 
 // =========================================
-// Catálogo Dinámico (JSON)
+// CARGAR CONFIG DESDE FIREBASE
+// =========================================
+async function loadConfig() {
+    try {
+        const docSnap = await getDoc(doc(db, "configuracion", "general"));
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data.whatsappNumber) CONFIG.WHATSAPP_NUMBER = data.whatsappNumber;
+            if (data.facebookUrl) CONFIG.FACEBOOK_URL = data.facebookUrl;
+            if (data.instagramUrl) CONFIG.INSTAGRAM_URL = data.instagramUrl;
+        }
+    } catch (err) { console.log('Usando config por defecto'); }
+
+    // Actualizar links en la página
+    const waFloat = $(".whatsapp-float");
+    if (waFloat) waFloat.href = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}`;
+    const waFooter = $('a[href*="wa.me"]');
+    if (waFooter) waFooter.href = `https://wa.me/${CONFIG.WHATSAPP_NUMBER}`;
+    const igLink = $("#instagram-link");
+    if (igLink) igLink.href = CONFIG.FACEBOOK_URL || CONFIG.INSTAGRAM_URL || '#';
+}
+
+// =========================================
+// CATÁLOGO DINÁMICO (Firebase)
 // =========================================
 async function loadCatalog() {
     try {
-        const response = await fetch('productos.json');
-        const productos = await response.json();
+        // Cargar categorías de Firebase
+        const catSnap = await getDocs(collection(db, "categorias"));
+        let categorias = [];
+        catSnap.forEach(d => categorias.push(d.data()));
+
+        // Si no hay categorías en Firebase, usamos las por defecto de la página
+        if (categorias.length === 0) {
+            categorias = [
+                { nombre: 'Garage / Bazar', slug: 'garage' },
+                { nombre: 'Personalizados', slug: 'custom' },
+                { nombre: 'Copias e Impresiones', slug: 'impresiones' },
+                { nombre: 'Papelería', slug: 'papeleria' }
+            ];
+        }
+
+        // Generar filtros dinámicos
+        const filtersContainer = $(".filters");
+        if (filtersContainer) {
+            filtersContainer.innerHTML = '<button class="filter-btn active" data-filter="all">Todos</button>';
+            categorias.forEach(c => {
+                filtersContainer.innerHTML += `<button class="filter-btn" data-filter="${c.slug}">${c.nombre}</button>`;
+            });
+        }
+
+        // Cargar productos
+        const snap = await getDocs(collection(db, "productos"));
+        const productos = [];
+        snap.forEach(d => productos.push(d.data()));
 
         const container = $("#catalog-container");
-        container.innerHTML = ''; // Limpiar contenedor
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (productos.length === 0) {
+            container.innerHTML = '<p style="text-align:center; width:100%; color:var(--text-muted);">Aún no hay productos disponibles.</p>';
+            return;
+        }
 
         productos.forEach(prod => {
-            // Determinar clase del badge según estado
             let badgeClass = 'badge-available';
-            if (prod.estado === 'Vendido') badgeClass = 'badge-sold';
-            if (prod.estado === 'Apartado') badgeClass = 'badge-reserved';
+            let estadoTexto = prod.estado || 'Disponible';
+            if (estadoTexto === 'Vendido') badgeClass = 'badge-sold';
+            if (estadoTexto === 'Apartado') badgeClass = 'badge-reserved';
 
-            // Construir tarjeta
             const card = document.createElement('div');
-            card.className = 'product-card reveal visible'; // visible para que no espere scroll si ya cargó
-            card.setAttribute('data-category', prod.categoria);
+            card.className = 'product-card reveal visible';
+            card.setAttribute('data-category', prod.categoria || 'otro');
+
+            const imgUrl = prod.imagen || 'https://via.placeholder.com/300x300?text=Sin+Imagen';
 
             card.innerHTML = `
                 <div class="product-image-container">
-                    <img src="${prod.imagen}" alt="${prod.nombre}" class="product-img">
-                    <span class="status ${badgeClass}">${prod.estado}</span>
+                    <img src="${imgUrl}" alt="${prod.nombre}" class="product-img">
+                    <span class="status ${badgeClass}">${estadoTexto}</span>
                 </div>
                 <div class="product-info">
                     <h3>${prod.nombre}</h3>
                     <p class="price">$${prod.precio} MXN</p>
-                    <button class="btn btn-primary product-interest w-100" 
-                            data-nombre="${prod.nombre}" 
+                    <button class="btn btn-primary product-interest w-100"
+                            data-nombre="${prod.nombre}"
                             data-precio="${prod.precio}">
                         Preguntar por WhatsApp
                     </button>
@@ -86,55 +151,111 @@ async function loadCatalog() {
             container.appendChild(card);
         });
 
-        // Setup Filters & CTAs after loading
         setupFilters();
         setupProductCTAs();
-
     } catch (error) {
-        console.error("Error cargando el catálogo:", error);
-        $("#catalog-container").innerHTML = '<p style="text-align:center; width:100%;">No se pudieron cargar los productos en este momento.</p>';
+        console.error("Error cargando catálogo:", error);
+        const container = $("#catalog-container");
+        if (container) container.innerHTML = '<p style="text-align:center; width:100%;">No se pudieron cargar los productos.</p>';
     }
 }
 
-// Configurar Filtros
+// =========================================
+// NOVEDADES DINÁMICAS
+// =========================================
+async function loadNovedades() {
+    try {
+        const snap = await getDocs(collection(db, "novedades"));
+        const novedades = [];
+        snap.forEach(d => novedades.push(d.data()));
+
+        const grid = $(".novedades-grid");
+        if (!grid || novedades.length === 0) return;
+
+        grid.innerHTML = novedades.map(n =>
+            `<div class="novedad-card ${n.destacada ? 'highlight' : ''}">
+                ${n.imagen ? `<img src="${n.imagen}" alt="${n.titulo}" style="width: 100%; border-radius: 8px; margin-bottom: 15px; object-fit: cover; max-height: 200px;">` : ''}
+                <h4>${n.titulo}</h4>
+                <p>${n.descripcion}</p>
+            </div>`
+        ).join('');
+    } catch (err) { console.log('Novedades: usando HTML estático'); }
+}
+
+// =========================================
+// PROMOCIONES DINÁMICAS
+// =========================================
+async function loadPromos() {
+    try {
+        const snap = await getDocs(collection(db, "promociones"));
+        const promos = [];
+        snap.forEach(d => promos.push(d.data()));
+
+        const activePromos = promos.filter(p => p.activa);
+        const promoSection = $("#promotions");
+        if (!promoSection) return;
+
+        if (activePromos.length === 0) {
+            promoSection.style.display = 'none';
+            return;
+        }
+
+        promoSection.style.display = '';
+        const container = promoSection.querySelector('.container');
+        if (container) {
+            container.innerHTML = activePromos.map(p =>
+                `<div class="promo-banner reveal visible" ${p.imagen ? `style="background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('${p.imagen}'); background-size: cover; background-position: center;"` : ''}>
+                    <div class="promo-content">
+                        <h3>${p.titulo}</h3>
+                        <p>${p.texto}</p>
+                    </div>
+                </div>`
+            ).join('');
+        }
+    } catch (err) { console.log('Promos: usando HTML estático'); }
+}
+
+// =========================================
+// GALERÍA DINÁMICA
+// =========================================
+async function loadGallery() {
+    try {
+        const snap = await getDocs(collection(db, "galeria"));
+        const fotos = [];
+        snap.forEach(d => fotos.push(d.data()));
+
+        const grid = $(".gallery-grid");
+        if (!grid || fotos.length === 0) return;
+
+        grid.innerHTML = fotos.map(f =>
+            `<div class="gallery-item"><img src="${f.imagen}" alt="${f.alt || 'Trabajo'}"></div>`
+        ).join('');
+    } catch (err) { console.log('Galería: usando HTML estático'); }
+}
+
+// =========================================
+// FILTROS
+// =========================================
 function setupFilters() {
-    const filterBtns = $$(".filter-btn");
-    const productCards = $$(".product-card");
-
-    filterBtns.forEach(btn => {
-        // Remover eventos previos si los hay (prevención de duplicados)
-        btn.replaceWith(btn.cloneNode(true));
-    });
-
-    // Re-seleccionar botones clonados
     $$(".filter-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             $$(".filter-btn").forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
-
             const filterValue = btn.getAttribute("data-filter");
-            const productCards = $$(".product-card");
-
-            productCards.forEach(card => {
+            $$(".product-card").forEach(card => {
                 if (filterValue === "all" || card.getAttribute("data-category") === filterValue) {
                     card.style.display = "block";
-                    setTimeout(() => {
-                        card.style.opacity = "1";
-                        card.style.transform = "scale(1)";
-                    }, 50);
+                    setTimeout(() => { card.style.opacity = "1"; card.style.transform = "scale(1)"; }, 50);
                 } else {
-                    card.style.opacity = "0";
-                    card.style.transform = "scale(0.9)";
-                    setTimeout(() => {
-                        card.style.display = "none";
-                    }, 300);
+                    card.style.opacity = "0"; card.style.transform = "scale(0.9)";
+                    setTimeout(() => card.style.display = "none", 300);
                 }
             });
         });
     });
 }
 
-// Configurar CTAs de Productos
+// Configurar CTAs
 function setupProductCTAs() {
     $$(".product-interest").forEach(button => {
         button.addEventListener("click", () => {
@@ -146,35 +267,24 @@ function setupProductCTAs() {
     });
 }
 
-// Iniciar carga de catálogo
-document.addEventListener("DOMContentLoaded", () => {
-    loadCatalog();
+// =========================================
+// INICIALIZAR TODO
+// =========================================
+document.addEventListener("DOMContentLoaded", async () => {
+    await loadConfig();
+    await Promise.all([loadCatalog(), loadNovedades(), loadPromos(), loadGallery()]);
 });
-
 
 // =========================================
 // FAQ Accordion
 // =========================================
 const faqItems = $$(".faq-item");
-
 faqItems.forEach(item => {
     const question = item.querySelector(".faq-question");
-
     question.addEventListener("click", () => {
         const isActive = item.classList.contains("active");
-
-        // Close all items
-        faqItems.forEach(i => {
-            i.classList.remove("active");
-            i.querySelector(".faq-answer").style.maxHeight = null;
-        });
-
-        // If it wasn't active, open it
-        if (!isActive) {
-            item.classList.add("active");
-            const answer = item.querySelector(".faq-answer");
-            answer.style.maxHeight = answer.scrollHeight + "px";
-        }
+        faqItems.forEach(i => { i.classList.remove("active"); i.querySelector(".faq-answer").style.maxHeight = null; });
+        if (!isActive) { item.classList.add("active"); const answer = item.querySelector(".faq-answer"); answer.style.maxHeight = answer.scrollHeight + "px"; }
     });
 });
 
@@ -185,101 +295,47 @@ const form = $("#contact-form");
 if (form) {
     form.addEventListener("submit", (event) => {
         event.preventDefault();
-
         const name = $("#name").value.trim();
         const service = $("#service").value;
         const message = $("#message").value.trim();
-
-        if (!name || !service || !message) {
-            showToast("Por favor completa todos los campos.");
-            return;
-        }
-
-        const text = `Hola, soy ${name}.
-Vi la página de mattEvan.
-
-Me interesa: ${service}
-
-Detalle:
-${message}`;
-
+        if (!name || !service || !message) { showToast("Por favor completa todos los campos."); return; }
+        const text = `Hola, soy ${name}.\nVi la página de mattEvan.\n\nMe interesa: ${service}\n\nDetalle:\n${message}`;
         window.open(buildWhatsappUrl(text), "_blank", "noopener,noreferrer");
     });
 }
-
 
 // =========================================
 // Scroll Reveal
 // =========================================
 const revealObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            entry.target.classList.add("visible");
-            revealObserver.unobserve(entry.target); // Solo anima una vez
-        }
-    });
+    entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add("visible"); revealObserver.unobserve(entry.target); } });
 }, { threshold: 0.15 });
-
 $$(".reveal").forEach(el => revealObserver.observe(el));
 
-// Dynamic year and Social links
+// Dynamic year
 const yearEl = $("#year");
 if (yearEl) yearEl.textContent = new Date().getFullYear();
 
-const igLink = $("#instagram-link");
-if (igLink) igLink.href = CONFIG.INSTAGRAM_URL;
-
 // =========================================
-// Interactive Features
+// Cursor Glow & Typewriter
 // =========================================
-
-// 1. Cursor Glow Effect
 const cursorGlow = $(".cursor-glow");
 if (cursorGlow) {
-    document.addEventListener("mousemove", (e) => {
-        cursorGlow.style.left = e.clientX + "px";
-        cursorGlow.style.top = e.clientY + "px";
-    });
+    document.addEventListener("mousemove", (e) => { cursorGlow.style.left = e.clientX + "px"; cursorGlow.style.top = e.clientY + "px"; });
 }
 
-// 2. Typewriter Effect
 const words = ["Páginas Web.", "Tazas.", "Playeras.", "Impresiones.", "Stickers.", "Identidad."];
-let wordIndex = 0;
-let charIndex = 0;
-let isDeleting = false;
+let wordIndex = 0, charIndex = 0, isDeleting = false;
 const typewriterElement = $("#typewriter");
 
 function type() {
     if (!typewriterElement) return;
-
     const currentWord = words[wordIndex];
-
-    if (isDeleting) {
-        typewriterElement.textContent = currentWord.substring(0, charIndex - 1);
-        charIndex--;
-    } else {
-        typewriterElement.textContent = currentWord.substring(0, charIndex + 1);
-        charIndex++;
-    }
-
-    let typeSpeed = 100;
-
-    if (isDeleting) {
-        typeSpeed /= 2; // Delete faster
-    }
-
-    if (!isDeleting && charIndex === currentWord.length) {
-        // Pause at end of word
-        typeSpeed = 2000;
-        isDeleting = true;
-    } else if (isDeleting && charIndex === 0) {
-        isDeleting = false;
-        wordIndex = (wordIndex + 1) % words.length;
-        typeSpeed = 500; // Pause before starting new word
-    }
-
+    typewriterElement.textContent = isDeleting ? currentWord.substring(0, charIndex - 1) : currentWord.substring(0, charIndex + 1);
+    isDeleting ? charIndex-- : charIndex++;
+    let typeSpeed = isDeleting ? 50 : 100;
+    if (!isDeleting && charIndex === currentWord.length) { typeSpeed = 2000; isDeleting = true; }
+    else if (isDeleting && charIndex === 0) { isDeleting = false; wordIndex = (wordIndex + 1) % words.length; typeSpeed = 500; }
     setTimeout(type, typeSpeed);
 }
-
-// Start typewriter effect after a short delay
 setTimeout(type, 1000);

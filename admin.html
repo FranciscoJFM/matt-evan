@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mattevan Admin - MODO BESTIA</title>
+    <link rel="stylesheet" href="admin.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <!-- ========== PANTALLA DE LOGIN ========== -->
+    <div id="login-screen" class="screen active">
+        <div class="login-box">
+            <h1>🛡️ ZONA VIP MATTEVAN</h1>
+            <p>Ingresa tus credenciales para administrar el sitio</p>
+            <input type="email" id="email" placeholder="Correo Electrónico">
+            <input type="password" id="password" placeholder="Contraseña">
+            <button id="login-btn" class="beast-btn">ENTRAR AHORA <i class="fa-solid fa-bolt"></i></button>
+            <p id="login-error" class="error-msg"></p>
+        </div>
+    </div>
+
+    <!-- ========== PANEL PRINCIPAL (DASHBOARD) ========== -->
+    <div id="dashboard-screen" class="screen">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>MATTEVAN ⚡</h2>
+                <button class="sidebar-toggle" id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-section="sec-dashboard">
+                    <i class="fa-solid fa-chart-pie"></i><span>Dashboard</span>
+                </button>
+                <button class="nav-item" data-section="sec-productos">
+                    <i class="fa-solid fa-box"></i><span>Productos</span>
+                </button>
+                <button class="nav-item" data-section="sec-categorias">
+                    <i class="fa-solid fa-tags"></i><span>Categorías</span>
+                </button>
+                <button class="nav-item" data-section="sec-novedades">
+                    <i class="fa-solid fa-newspaper"></i><span>Novedades</span>
+                </button>
+                <button class="nav-item" data-section="sec-promociones">
+                    <i class="fa-solid fa-bullhorn"></i><span>Promociones</span>
+                </button>
+                <button class="nav-item" data-section="sec-galeria">
+                    <i class="fa-solid fa-images"></i><span>Galería</span>
+                </button>
+                <button class="nav-item" data-section="sec-config">
+                    <i class="fa-solid fa-link"></i><span>Links & Config</span>
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logout-btn" class="logout-btn"><i class="fa-solid fa-right-from-bracket"></i><span>Cerrar Sesión</span></button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <div class="topbar">
+                <button class="mobile-menu-btn" id="mobile-menu-btn"><i class="fa-solid fa-bars"></i></button>
+                <h3 id="section-title">Dashboard</h3>
+                <span class="topbar-user"><i class="fa-solid fa-user-shield"></i> Admin</span>
+            </div>
+
+            <!-- ===== SECCIÓN: DASHBOARD ===== -->
+            <section class="content-section active" id="sec-dashboard">
+                <div class="stats-cards">
+                    <div class="stat-card cyan">
+                        <div class="stat-icon"><i class="fa-solid fa-box"></i></div>
+                        <div>
+                            <h4>Total Productos</h4>
+                            <p id="stat-total">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card green">
+                        <div class="stat-icon"><i class="fa-solid fa-check-circle"></i></div>
+                        <div>
+                            <h4>Disponibles</h4>
+                            <p id="stat-disponibles">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-icon"><i class="fa-solid fa-ban"></i></div>
+                        <div>
+                            <h4>Vendidos</h4>
+                            <p id="stat-vendidos">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-card yellow">
+                        <div class="stat-icon"><i class="fa-solid fa-images"></i></div>
+                        <div>
+                            <h4>Fotos Galería</h4>
+                            <p id="stat-galeria">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="dashboard-grid">
+                    <div class="dash-card">
+                        <h4>Productos por Categoría</h4>
+                        <div id="cat-breakdown" class="cat-breakdown"></div>
+                    </div>
+                    <div class="dash-card">
+                        <h4>Acciones Rápidas</h4>
+                        <button class="beast-btn-sm" onclick="document.querySelector('[data-section=sec-productos]').click()"><i class="fa-solid fa-plus"></i> Nuevo Producto</button>
+                        <button class="beast-btn-sm" onclick="document.querySelector('[data-section=sec-galeria]').click()"><i class="fa-solid fa-camera"></i> Subir Foto</button>
+                        <button class="beast-btn-sm" onclick="document.querySelector('[data-section=sec-novedades]').click()"><i class="fa-solid fa-pen"></i> Editar Novedades</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: PRODUCTOS ===== -->
+            <section class="content-section" id="sec-productos">
+                <div class="section-header">
+                    <h2>Gestión de Productos 📦</h2>
+                    <button id="add-product-btn" class="beast-btn pulse"><i class="fa-solid fa-plus"></i> Nuevo Producto</button>
+                </div>
+                <div class="products-grid" id="admin-products-list">
+                    <p class="loading-text">Cargando productos...</p>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: CATEGORÍAS ===== -->
+            <section class="content-section" id="sec-categorias">
+                <div class="section-header">
+                    <h2>Categorías 🏷️</h2>
+                    <button id="add-category-btn" class="beast-btn"><i class="fa-solid fa-plus"></i> Nueva Categoría</button>
+                </div>
+                <p class="section-desc">Las categorías aparecen como botones de filtro en tu catálogo.</p>
+                <div class="items-list" id="admin-categories-list">
+                    <p class="loading-text">Cargando categorías...</p>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: NOVEDADES ===== -->
+            <section class="content-section" id="sec-novedades">
+                <div class="section-header">
+                    <h2>Esta Semana en mattEvan 🆕</h2>
+                    <button id="add-novedad-btn" class="beast-btn"><i class="fa-solid fa-plus"></i> Nueva Novedad</button>
+                </div>
+                <p class="section-desc">Estas tarjetas aparecen en la sección "Esta semana" de tu página.</p>
+                <div class="items-list" id="admin-novedades-list">
+                    <p class="loading-text">Cargando novedades...</p>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: PROMOCIONES ===== -->
+            <section class="content-section" id="sec-promociones">
+                <div class="section-header">
+                    <h2>Promociones 🎯</h2>
+                    <button id="add-promo-btn" class="beast-btn"><i class="fa-solid fa-plus"></i> Nueva Promoción</button>
+                </div>
+                <p class="section-desc">Controla el banner de promoción de tu página.</p>
+                <div class="items-list" id="admin-promos-list">
+                    <p class="loading-text">Cargando promociones...</p>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: GALERÍA ===== -->
+            <section class="content-section" id="sec-galeria">
+                <div class="section-header">
+                    <h2>Galería de Trabajos 📸</h2>
+                    <button id="add-gallery-btn" class="beast-btn"><i class="fa-solid fa-plus"></i> Subir Imagen</button>
+                </div>
+                <p class="section-desc">Las fotos aparecen en la sección "Trabajos Reales" de tu página.</p>
+                <div class="gallery-admin-grid" id="admin-gallery-list">
+                    <p class="loading-text">Cargando galería...</p>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: LINKS & CONFIG ===== -->
+            <section class="content-section" id="sec-config">
+                <div class="section-header">
+                    <h2>Links & Configuración 🔗</h2>
+                </div>
+                <p class="section-desc">Estos datos se usan en toda tu página: WhatsApp, redes sociales y textos del footer.</p>
+                <form id="config-form" class="config-form">
+                    <div class="form-group">
+                        <label><i class="fa-brands fa-whatsapp"></i> Número de WhatsApp (con código de país)</label>
+                        <input type="text" id="cfg-whatsapp" placeholder="Ej. 525614429971">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fa-brands fa-facebook"></i> Link de Facebook</label>
+                        <input type="url" id="cfg-facebook" placeholder="https://facebook.com/...">
+                    </div>
+                    <div class="form-group">
+                        <label><i class="fa-brands fa-instagram"></i> Link de Instagram</label>
+                        <input type="url" id="cfg-instagram" placeholder="https://instagram.com/...">
+                    </div>
+                    <button type="submit" class="beast-btn"><i class="fa-solid fa-save"></i> Guardar Configuración</button>
+                </form>
+            </section>
+        </main>
+    </div>
+
+    <!-- ========== MODAL GENÉRICO ========== -->
+    <div id="modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Formulario</h2>
+                <button id="close-modal" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- El contenido del form se inyecta dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="admin-toast" class="admin-toast"></div>
+
+    <script type="module" src="admin.js"></script>
+</body>
+</html>
