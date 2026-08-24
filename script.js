@@ -107,14 +107,13 @@ async function loadCatalog() {
             });
         }
 
-        // Cargar productos
+        // Cargar productos (solo los disponibles o apartados, los vendidos van al historial del admin)
         const snap = await getDocs(collection(db, "productos"));
         const productos = [];
         snap.forEach(d => {
-            const data = d.data();
-            // Filtrar los vendidos para que no aparezcan en la página pública
-            if (data.estado !== 'Vendido') {
-                productos.push(data);
+            const p = d.data();
+            if (!p.estado || p.estado === 'Disponible' || p.estado === 'Apartado') {
+                productos.push(p);
             }
         });
 

@@ -125,11 +125,24 @@ async function loadProducts() {
         return;
     }
 
-    list.innerHTML = allProducts.map(p => {
+    const vendidos = allProducts.filter(p => p.estado === 'Vendido');
+    const activos  = allProducts.filter(p => p.estado !== 'Vendido');
+
+    // Banner de historial si hay vendidos
+    const historicoBanner = vendidos.length > 0 ? `
+        <div class="sold-history-banner">
+            <span>📆 Historial: <strong>${vendidos.length}</strong> producto${vendidos.length > 1 ? 's' : ''} vendido${vendidos.length > 1 ? 's' : ''} (oculto${vendidos.length > 1 ? 's' : ''} en tu página)</span>
+            <button class="btn-clear-history" onclick="clearSoldHistory()">
+                <i class="fa-solid fa-broom"></i> Limpiar historial
+            </button>
+        </div>` : '';
+
+    list.innerHTML = historicoBanner + allProducts.map(p => {
         const badgeClass = p.estado === 'Vendido' ? 'badge-vendido' : p.estado === 'Apartado' ? 'badge-apartado' : 'badge-disponible';
         const imgUrl = p.imagen || 'https://via.placeholder.com/300x200?text=Sin+Imagen';
+        const soldStyle = p.estado === 'Vendido' ? 'opacity:0.5; filter:grayscale(80%);' : '';
         return `
-        <div class="product-card">
+        <div class="product-card" style="${soldStyle}">
             <img src="${imgUrl}" alt="${p.nombre}">
             <div class="product-card-body">
                 <span class="badge ${badgeClass}">${p.estado || 'Disponible'}</span>
@@ -238,6 +251,24 @@ window.deleteProduct = async function(id) {
         console.error(err);
         alert('Error exacto de Firebase al intentar eliminar el producto: ' + err.message);
         toast('Error al eliminar', true); 
+    }
+};
+
+window.clearSoldHistory = async function() {
+    const vendidos = allProducts.filter(p => p.estado === 'Vendido');
+    if (vendidos.length === 0) { toast('No hay vendidos que limpiar'); return; }
+    if (!confirm(`¿Eliminar los ${vendidos.length} productos vendidos del historial? Esta acción no se puede deshacer.`)) return;
+    
+    try {
+        const deletes = vendidos.map(p => deleteDoc(doc(db, "productos", p.id)));
+        await Promise.all(deletes);
+        toast(`¡Historial limpio! ${vendidos.length} vendido${vendidos.length > 1 ? 's' : ''} eliminado${vendidos.length > 1 ? 's' : ''} 🗑️`);
+        await loadProducts();
+        updateDashboard();
+    } catch (err) {
+        console.error(err);
+        alert('Error al limpiar: ' + err.message);
+        toast('Error al limpiar historial', true);
     }
 };
 
