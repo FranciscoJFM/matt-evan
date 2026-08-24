@@ -107,13 +107,15 @@ async function loadCatalog() {
             });
         }
 
-        // Cargar productos (solo los disponibles o apartados, los vendidos van al historial del admin)
+        // Cargar productos (solo los disponibles o apartados con stock, los vendidos y agotados van al historial del admin)
         const snap = await getDocs(collection(db, "productos"));
         const productos = [];
         snap.forEach(d => {
             const p = d.data();
-            if (!p.estado || p.estado === 'Disponible' || p.estado === 'Apartado') {
-                productos.push(p);
+            const qty = p.cantidad ?? 1; // Si no tiene cantidad definida, asumimos 1
+            const estadoOk = !p.estado || p.estado === 'Disponible' || p.estado === 'Apartado';
+            if (estadoOk && qty > 0) {
+                productos.push({ ...p, cantidad: qty });
             }
         });
 
@@ -137,11 +139,15 @@ async function loadCatalog() {
             card.setAttribute('data-category', prod.categoria || 'otro');
 
             const imgUrl = prod.imagen || 'https://via.placeholder.com/300x300?text=Sin+Imagen';
+            const qty = prod.cantidad ?? 1;
+            const stockHtml = prod.estado === 'Apartado' ? '' :
+                qty <= 2 ? `<span class="stock-warning">🔥 ¡Último${qty > 1 ? 's ' + qty : ''}!</span>` : '';
 
             card.innerHTML = `
                 <div class="product-image-container">
                     <img src="${imgUrl}" alt="${prod.nombre}" class="product-img">
                     <span class="status ${badgeClass}">${estadoTexto}</span>
+                    ${stockHtml}
                 </div>
                 <div class="product-info">
                     <h3>${prod.nombre}</h3>

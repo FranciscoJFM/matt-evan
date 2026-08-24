@@ -141,11 +141,17 @@ async function loadProducts() {
         const badgeClass = p.estado === 'Vendido' ? 'badge-vendido' : p.estado === 'Apartado' ? 'badge-apartado' : 'badge-disponible';
         const imgUrl = p.imagen || 'https://via.placeholder.com/300x200?text=Sin+Imagen';
         const soldStyle = p.estado === 'Vendido' ? 'opacity:0.5; filter:grayscale(80%);' : '';
+        const qty = p.cantidad ?? 1;
+        const stockLabel = p.estado === 'Vendido' ? '' :
+            qty <= 0 ? `<span class="stock-badge agotado">⚠️ Agotado</span>` :
+            qty <= 2 ? `<span class="stock-badge pocas">🔥 ${qty} restante${qty > 1 ? 's' : ''}</span>` :
+            `<span class="stock-badge normal">📦 Stock: ${qty}</span>`;
         return `
         <div class="product-card" style="${soldStyle}">
             <img src="${imgUrl}" alt="${p.nombre}">
             <div class="product-card-body">
                 <span class="badge ${badgeClass}">${p.estado || 'Disponible'}</span>
+                ${stockLabel}
                 <h3>${p.nombre}</h3>
                 <p class="price">$${p.precio} MXN</p>
                 <p class="cat-label">${p.categoria || 'Sin categoría'}</p>
@@ -177,7 +183,10 @@ function showProductForm(product = null) {
     openModal(isEdit ? 'EDITAR PRODUCTO' : 'NUEVO PRODUCTO', `
         <form id="pf">
             <div class="form-group"><label>Nombre</label><input type="text" id="pf-name" required value="${product?.nombre || ''}" placeholder="Ej. Camiseta Mattevan"></div>
-            <div class="form-group"><label>Precio (MXN)</label><input type="number" id="pf-price" required value="${product?.precio || ''}" placeholder="250"></div>
+            <div class="form-row">
+                <div class="form-group"><label>Precio (MXN)</label><input type="number" id="pf-price" required value="${product?.precio || ''}" placeholder="250"></div>
+                <div class="form-group"><label>Cantidad en stock</label><input type="number" id="pf-qty" min="0" value="${product?.cantidad ?? 1}" placeholder="1"></div>
+            </div>
             <div class="form-group"><label>Categoría</label><select id="pf-cat">${catOptions || '<option value="general">Sin categorías</option>'}</select></div>
             <div class="form-group"><label>Estado</label>
                 <select id="pf-status">
@@ -204,6 +213,7 @@ function showProductForm(product = null) {
             const data = {
                 nombre: document.getElementById('pf-name').value,
                 precio: Number(document.getElementById('pf-price').value),
+                cantidad: Number(document.getElementById('pf-qty').value) || 1,
                 categoria: document.getElementById('pf-cat').value,
                 estado: document.getElementById('pf-status').value,
                 descripcion: document.getElementById('pf-desc').value,

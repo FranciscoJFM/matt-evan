@@ -479,6 +479,25 @@ body {
     overflow: hidden;
 }
 
+/* Badge de stock bajo / último en la página pública */
+.stock-warning {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(255, 165, 0, 0.85);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    backdrop-filter: blur(6px);
+    animation: pulse-stock 1.5s ease-in-out infinite;
+}
+@keyframes pulse-stock {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+
 .product-img {
     width: 100%;
     height: 100%;
