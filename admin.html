@@ -42,6 +42,9 @@
                 <button class="nav-item" data-section="sec-categorias">
                     <i class="fa-solid fa-tags"></i><span>Categorías</span>
                 </button>
+                <button class="nav-item" data-section="sec-encargos">
+                    <i class="fa-solid fa-clipboard-list"></i><span>Encargos</span>
+                </button>
                 <button class="nav-item" data-section="sec-novedades">
                     <i class="fa-solid fa-newspaper"></i><span>Novedades</span>
                 </button>
@@ -135,6 +138,17 @@
                 <p class="section-desc">Las categorías aparecen como botones de filtro en tu catálogo.</p>
                 <div class="items-list" id="admin-categories-list">
                     <p class="loading-text">Cargando categorías...</p>
+                </div>
+            </section>
+
+            <!-- ===== SECCIÓN: ENCARGOS ===== -->
+            <section class="content-section" id="sec-encargos">
+                <div class="section-header">
+                    <h2>📋 Lista de Encargos / Pedidos</h2>
+                    <button class="btn-primary" id="add-encargo-btn"><i class="fa-solid fa-plus"></i> Nuevo Encargo</button>
+                </div>
+                <div class="admin-grid" id="admin-encargos-list">
+                    <!-- Se llenará con JS -->
                 </div>
             </section>
 

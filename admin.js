@@ -97,6 +97,7 @@ async function loadAll() {
     await Promise.all([
         loadProducts(),
         loadCategories(),
+        loadEncargos(),
         loadNovedades(),
         loadPromos(),
         loadGallery(),
@@ -337,6 +338,106 @@ window.editCategory = function(id) { const c = allCategories.find(x => x.id === 
 window.deleteCategory = async function(id) {
     if (!confirm('¿Eliminar esta categoría?')) return;
     try { await deleteDoc(doc(db, "categorias", id)); toast('Categoría eliminada 🗑️'); await loadCategories(); } catch (err) { 
+        console.error(err);
+        alert('Error exacto: ' + err.message);
+        toast('Error', true); 
+    }
+};
+
+// ======================================================
+//  ENCARGOS / PEDIDOS
+// ======================================================
+let allEncargos = [];
+document.getElementById('add-encargo-btn').addEventListener('click', () => showEncargoForm());
+
+async function loadEncargos() {
+    const list = document.getElementById('admin-encargos-list');
+    list.innerHTML = '<p class="loading-text">Cargando encargos...</p>';
+    const snap = await getDocs(collection(db, "encargos"));
+    allEncargos = [];
+    snap.forEach(d => allEncargos.push({ id: d.id, ...d.data() }));
+
+    if (allEncargos.length === 0) {
+        list.innerHTML = '<p class="empty-state">No tienes encargos pendientes.</p>';
+        return;
+    }
+
+    list.innerHTML = allEncargos.map(e => {
+        let badgeClass = 'badge-disponible';
+        if (e.estado === 'Entregado') badgeClass = 'badge-apartado';
+        if (e.estado === 'Cancelado') badgeClass = 'badge-vendido';
+        if (e.estado === 'Conseguido') badgeClass = 'badge-disponible';
+
+        return `
+        <div class="list-item" style="${e.estado === 'Entregado' || e.estado === 'Cancelado' ? 'opacity:0.6' : ''}">
+            <div class="list-item-info">
+                <h4><i class="fa-solid fa-user"></i> ${e.cliente}</h4>
+                <p><strong>Pide:</strong> ${e.producto}</p>
+                <p>📞 ${e.telefono || 'Sin teléfono'}</p>
+                <span class="badge ${badgeClass}" style="margin-top:5px;display:inline-block">${e.estado || 'Pendiente'}</span>
+            </div>
+            <div class="list-item-actions">
+                <button class="btn-edit" onclick="editEncargo('${e.id}')"><i class="fa-solid fa-pen"></i></button>
+                <button class="btn-delete" onclick="deleteEncargo('${e.id}')"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+function showEncargoForm(encargo = null) {
+    const isEdit = !!encargo;
+    openModal(isEdit ? 'EDITAR ENCARGO' : 'NUEVO ENCARGO', `
+        <form id="ef">
+            <div class="form-group"><label>Nombre del Cliente</label><input type="text" id="ef-cliente" required value="${encargo?.cliente || ''}" placeholder="Ej. Juan Pérez"></div>
+            <div class="form-group"><label>¿Qué producto busca?</label><input type="text" id="ef-producto" required value="${encargo?.producto || ''}" placeholder="Ej. Play 2 con 2 controles"></div>
+            <div class="form-group"><label>Teléfono (WhatsApp)</label><input type="text" id="ef-telefono" value="${encargo?.telefono || ''}" placeholder="Ej. 5512345678"></div>
+            <div class="form-group"><label>Estado</label>
+                <select id="ef-estado">
+                    <option value="Pendiente" ${encargo?.estado === 'Pendiente' ? 'selected' : ''}>Pendiente (Buscándolo)</option>
+                    <option value="Conseguido" ${encargo?.estado === 'Conseguido' ? 'selected' : ''}>Conseguido (Listo para entregar)</option>
+                    <option value="Entregado" ${encargo?.estado === 'Entregado' ? 'selected' : ''}>Entregado (Finalizado)</option>
+                    <option value="Cancelado" ${encargo?.estado === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
+                </select>
+            </div>
+            <button type="submit" class="btn-primary w-100 mt-2">${isEdit ? 'Guardar Cambios' : 'Crear Encargo'}</button>
+        </form>
+    `);
+
+    document.getElementById('ef').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button');
+        btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
+        
+        try {
+            const data = {
+                cliente: document.getElementById('ef-cliente').value,
+                producto: document.getElementById('ef-producto').value,
+                telefono: document.getElementById('ef-telefono').value,
+                estado: document.getElementById('ef-estado').value
+            };
+            if (isEdit) {
+                await updateDoc(doc(db, "encargos", encargo.id), data);
+                toast('Encargo actualizado ✅');
+            } else {
+                await addDoc(collection(db, "encargos"), data);
+                toast('Encargo creado ✅');
+            }
+            closeModal();
+            await loadEncargos();
+        } catch (err) {
+            console.error(err);
+            alert('Error: ' + err.message);
+            toast('Error al guardar', true);
+            btn.disabled = false; btn.innerText = 'Intentar de nuevo';
+        }
+    });
+}
+
+window.editEncargo = function(id) { const e = allEncargos.find(x => x.id === id); if (e) showEncargoForm(e); };
+window.deleteEncargo = async function(id) {
+    if (!confirm('¿Eliminar este encargo?')) return;
+    try { await deleteDoc(doc(db, "encargos", id)); toast('Encargo eliminado 🗑️'); await loadEncargos(); } catch (err) { 
         console.error(err);
         alert('Error exacto: ' + err.message);
         toast('Error', true); 
