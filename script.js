@@ -143,19 +143,28 @@ async function loadCatalog() {
             const stockHtml = prod.estado === 'Apartado' ? '' :
                 qty <= 2 ? `<span class="stock-warning">🔥 ¡Último${qty > 1 ? 's ' + qty : ''}!</span>` : '';
 
+            let priceHtml = `<p class="price">$${prod.precio} MXN</p>`;
+            let discountBadge = '';
+            if (prod.precioViejo && prod.precioViejo > prod.precio) {
+                const discount = Math.round(((prod.precioViejo - prod.precio) / prod.precioViejo) * 100);
+                priceHtml = `<p class="price"><span class="old-price">$${prod.precioViejo}</span> $${prod.precio} MXN</p>`;
+                discountBadge = `<span class="discount-badge">-${discount}%</span>`;
+            }
+
             card.innerHTML = `
                 <div class="product-image-container">
                     <img src="${imgUrl}" alt="${prod.nombre}" class="product-img">
                     <span class="status ${badgeClass}">${estadoTexto}</span>
                     ${stockHtml}
+                    ${discountBadge}
                 </div>
                 <div class="product-info">
                     <h3>${prod.nombre}</h3>
-                    <p class="price">$${prod.precio} MXN</p>
+                    ${priceHtml}
                     <button class="btn btn-primary product-interest w-100"
                             data-nombre="${prod.nombre}"
                             data-precio="${prod.precio}">
-                        Preguntar por WhatsApp
+                        Añadir al Carrito 🛒
                     </button>
                 </div>
             `;
@@ -248,35 +257,156 @@ async function loadGallery() {
 // FILTROS
 // =========================================
 function setupFilters() {
+    const searchInput = $("#catalog-search");
+    
+    function applyFilters() {
+        const activeBtn = $(".filter-btn.active");
+        const filterCategory = activeBtn ? activeBtn.getAttribute("data-filter") : "all";
+        const searchText = searchInput ? searchInput.value.toLowerCase().trim() : "";
+
+        $$(".product-card").forEach(card => {
+            const cardCategory = card.getAttribute("data-category");
+            const cardName = card.querySelector("h3").textContent.toLowerCase();
+            
+            const matchCategory = filterCategory === "all" || cardCategory === filterCategory;
+            const matchSearch = cardName.includes(searchText);
+
+            if (matchCategory && matchSearch) {
+                card.style.display = "block";
+                setTimeout(() => { card.style.opacity = "1"; card.style.transform = "scale(1)"; }, 50);
+            } else {
+                card.style.opacity = "0"; card.style.transform = "scale(0.9)";
+                setTimeout(() => card.style.display = "none", 300);
+            }
+        });
+    }
+
+    // Eventos para los botones de categoría
     $$(".filter-btn").forEach(btn => {
         btn.addEventListener("click", () => {
             $$(".filter-btn").forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
-            const filterValue = btn.getAttribute("data-filter");
-            $$(".product-card").forEach(card => {
-                if (filterValue === "all" || card.getAttribute("data-category") === filterValue) {
-                    card.style.display = "block";
-                    setTimeout(() => { card.style.opacity = "1"; card.style.transform = "scale(1)"; }, 50);
-                } else {
-                    card.style.opacity = "0"; card.style.transform = "scale(0.9)";
-                    setTimeout(() => card.style.display = "none", 300);
-                }
-            });
+            applyFilters();
         });
     });
+
+    // Evento para el buscador
+    if (searchInput) {
+        searchInput.addEventListener("input", () => {
+            applyFilters();
+        });
+    }
 }
 
-// Configurar CTAs
+// =========================================
+// CARRITO DE COMPRAS
+// =========================================
+let cart = [];
+
 function setupProductCTAs() {
     $$(".product-interest").forEach(button => {
         button.addEventListener("click", () => {
             const nombre = button.dataset.nombre;
-            const precio = button.dataset.precio;
-            const text = `Hola, vi el ${nombre} de $${precio} en mattEvan. ¿Todavía está disponible?`;
-            window.open(buildWhatsappUrl(text), "_blank", "noopener,noreferrer");
+            const precio = parseInt(button.dataset.precio, 10);
+            
+            cart.push({ nombre, precio });
+            updateCartUI();
+            
+            // Animación de feedback
+            const originalText = button.innerHTML;
+            button.innerHTML = "¡Añadido! ✅";
+            button.style.background = "#25D366";
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.style.background = "";
+            }, 1500);
         });
     });
 }
+
+function updateCartUI() {
+    const btn = $("#floating-cart-btn");
+    const count = $("#cart-count");
+    if (cart.length > 0) {
+        btn.classList.remove("hidden");
+        count.innerText = cart.length;
+    } else {
+        btn.classList.add("hidden");
+    }
+    renderCartModal();
+}
+
+function renderCartModal() {
+    const container = $("#cart-items");
+    const totalEl = $("#cart-total-price");
+    
+    if (cart.length === 0) {
+        container.innerHTML = "<p style='text-align:center; color:#888;'>Tu carrito está vacío.</p>";
+        totalEl.innerText = "$0 MXN";
+        return;
+    }
+
+    let html = "";
+    let total = 0;
+    cart.forEach((item, index) => {
+        total += item.precio;
+        html += `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid rgba(255,255,255,0.1);">
+            <div style="flex:1;">
+                <h4 style="margin:0; font-size:1rem;">${item.nombre}</h4>
+                <span style="color:var(--primary);">$${item.precio} MXN</span>
+            </div>
+            <button onclick="window.removeFromCart(${index})" style="background:none; border:none; color:var(--red); font-size:1.2rem; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+        </div>`;
+    });
+    
+    container.innerHTML = html;
+    totalEl.innerText = `$${total} MXN`;
+}
+
+window.removeFromCart = function(index) {
+    cart.splice(index, 1);
+    updateCartUI();
+};
+
+// Eventos del Carrito Modal
+document.addEventListener("DOMContentLoaded", () => {
+    const modal = $("#cart-modal");
+    
+    $("#floating-cart-btn")?.addEventListener("click", () => {
+        modal.classList.add("active");
+    });
+    
+    $("#close-cart-btn")?.addEventListener("click", () => {
+        modal.classList.remove("active");
+    });
+    
+    $("#send-whatsapp-btn")?.addEventListener("click", () => {
+        if (cart.length === 0) return;
+        
+        let text = "¡Hola mattEvan! Quiero pedir lo siguiente:\n\n";
+        let total = 0;
+        cart.forEach(item => {
+            text += `👉 ${item.nombre} - $${item.precio}\n`;
+            total += item.precio;
+        });
+        
+        text += `\n*Total a pagar: $${total} MXN*`;
+        
+        const comments = $("#cart-comments").value.trim();
+        if (comments) {
+            text += `\n\n*Comentarios adicionales:*\n${comments}`;
+        }
+        
+        window.open(buildWhatsappUrl(text), "_blank", "noopener,noreferrer");
+        
+        // Limpiar carrito
+        cart = [];
+        $("#cart-comments").value = "";
+        updateCartUI();
+        modal.classList.remove("active");
+    });
+});
 
 // =========================================
 // INICIALIZAR TODO

@@ -81,6 +81,10 @@
         <div class="container">
             <h2 class="section-title reveal">🔥 Disponible Ahora</h2>
 
+            <div class="search-container reveal">
+                <input type="text" id="catalog-search" class="glass-input" placeholder="🔍 ¿Qué estás buscando? (ej. playera, taza, control...)">
+            </div>
+
             <div class="filters reveal">
                 <!-- Filtros se cargan dinámicamente desde Firebase -->
                 <button class="filter-btn active" data-filter="all">Todos</button>
@@ -304,7 +308,36 @@
                 d="M16.05 1C7.76 1 1.05 7.72 1.05 16.01c0 2.65.69 5.23 2 7.51L1 31l7.65-2.01c2.2.1.3 4.7 6.94 4.7 8.29 0 15-6.72 15-15.01C31.05 7.72 24.34 1 16.05 1zm0 28.5c-2.25 0-4.45-.6-6.38-1.74l-.45-.27-4.73 1.24 1.26-4.61-.29-.47C4.24 21.6 3.55 18.85 3.55 16c0-6.9 5.61-12.5 12.5-12.5s12.5 5.6 12.5 12.5-5.61 12.5-12.5 12.5zM22.9 20.3c-.38-.19-2.22-1.1-2.56-1.22-.34-.13-.59-.19-.84.19-.25.38-.97 1.22-1.19 1.47-.22.25-.44.28-.81.1-1.63-.82-3.1-1.89-4.22-3.07-.63-.67-1.1-1.46-1.43-2.31-.06-.17.13-.26.31-.44.17-.18.38-.44.56-.66.19-.22.25-.38.38-.63.13-.25.06-.47-.03-.66-.09-.19-.84-2.03-1.16-2.78-.31-.72-.62-.62-.84-.63h-.72c-.25 0-.66.09-1 .47-.34.38-1.31 1.28-1.31 3.13s1.34 3.63 1.53 3.88c.19.25 2.63 4.19 6.47 5.75 2.13.88 3.03.97 4.13.81 1.34-.19 2.22-.91 2.53-1.78.31-.88.31-1.63.22-1.78-.09-.16-.34-.25-.72-.44z" />
         </svg>
     </a>
+    <!-- Floating Cart Button -->
+    <button id="floating-cart-btn" class="floating-cart-btn hidden">
+        <i class="fa-solid fa-cart-shopping"></i>
+        <span id="cart-count">0</span>
+    </button>
 
+    <!-- Cart Modal -->
+    <div id="cart-modal" class="screen">
+        <div class="cart-box">
+            <button id="close-cart-btn" class="close-modal"><i class="fa-solid fa-xmark"></i></button>
+            <h2>🛒 Tu Pedido</h2>
+            <div id="cart-items" class="cart-items">
+                <!-- Artículos del carrito irán aquí -->
+            </div>
+            <div class="cart-total">
+                <span>Total:</span>
+                <span id="cart-total-price">$0 MXN</span>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>Comentarios adicionales (opcional)</label>
+                <textarea id="cart-comments" rows="2" placeholder="Ej. Paso a recogerlo a las 5 PM, lo quiero para regalo..."></textarea>
+            </div>
+            <button id="send-whatsapp-btn" class="btn btn-primary w-100 mt-2" style="background:#25D366; color:white;">
+                <i class="fa-brands fa-whatsapp"></i> Enviar Pedido
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script type="module" src="script.js"></script>
 </body>
 

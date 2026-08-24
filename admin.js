@@ -147,6 +147,11 @@ async function loadProducts() {
             qty <= 0 ? `<span class="stock-badge agotado">⚠️ Agotado</span>` :
             qty <= 2 ? `<span class="stock-badge pocas">🔥 ${qty} restante${qty > 1 ? 's' : ''}</span>` :
             `<span class="stock-badge normal">📦 Stock: ${qty}</span>`;
+            
+        const priceHtml = p.precioViejo 
+            ? `<p class="price"><span class="old-price">$${p.precioViejo}</span> $${p.precio} MXN</p>`
+            : `<p class="price">$${p.precio} MXN</p>`;
+
         return `
         <div class="product-card" style="${soldStyle}">
             <img src="${imgUrl}" alt="${p.nombre}">
@@ -154,11 +159,12 @@ async function loadProducts() {
                 <span class="badge ${badgeClass}">${p.estado || 'Disponible'}</span>
                 ${stockLabel}
                 <h3>${p.nombre}</h3>
-                <p class="price">$${p.precio} MXN</p>
+                ${priceHtml}
                 <p class="cat-label">${p.categoria || 'Sin categoría'}</p>
                 <div class="card-actions">
                     <button class="btn-edit" onclick="editProduct('${p.id}')"><i class="fa-solid fa-pen"></i> Editar</button>
                     <button class="btn-delete" onclick="deleteProduct('${p.id}')"><i class="fa-solid fa-trash"></i> Eliminar</button>
+                    ${p.estado === 'Vendido' ? `<button class="btn-ticket" onclick="generateTicket('${p.id}')"><i class="fa-solid fa-receipt"></i> Recibo</button>` : ''}
                 </div>
             </div>
         </div>`;
@@ -184,9 +190,10 @@ function showProductForm(product = null) {
     openModal(isEdit ? 'EDITAR PRODUCTO' : 'NUEVO PRODUCTO', `
         <form id="pf">
             <div class="form-group"><label>Nombre</label><input type="text" id="pf-name" required value="${product?.nombre || ''}" placeholder="Ej. Camiseta Mattevan"></div>
-            <div class="form-row">
-                <div class="form-group"><label>Precio (MXN)</label><input type="number" id="pf-price" required value="${product?.precio || ''}" placeholder="250"></div>
-                <div class="form-group"><label>Cantidad en stock</label><input type="number" id="pf-qty" min="0" value="${product?.cantidad ?? 1}" placeholder="1"></div>
+            <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+                <div class="form-group"><label>Precio de Oferta (MXN)</label><input type="number" id="pf-price" required value="${product?.precio || ''}" placeholder="250"></div>
+                <div class="form-group"><label>Precio Original (Opcional)</label><input type="number" id="pf-price-old" value="${product?.precioViejo || ''}" placeholder="350"></div>
+                <div class="form-group"><label>Cantidad (Stock)</label><input type="number" id="pf-qty" min="0" value="${product?.cantidad ?? 1}" placeholder="1"></div>
             </div>
             <div class="form-group"><label>Categoría</label><select id="pf-cat">${catOptions || '<option value="general">Sin categorías</option>'}</select></div>
             <div class="form-group"><label>Estado</label>
@@ -211,9 +218,11 @@ function showProductForm(product = null) {
         btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Guardando...';
 
         try {
+            const oldPriceVal = document.getElementById('pf-price-old').value;
             const data = {
                 nombre: document.getElementById('pf-name').value,
                 precio: Number(document.getElementById('pf-price').value),
+                precioViejo: oldPriceVal ? Number(oldPriceVal) : null,
                 cantidad: Number(document.getElementById('pf-qty').value) || 1,
                 categoria: document.getElementById('pf-cat').value,
                 estado: document.getElementById('pf-status').value,
@@ -281,6 +290,100 @@ window.clearSoldHistory = async function() {
         alert('Error al limpiar: ' + err.message);
         toast('Error al limpiar historial', true);
     }
+};
+
+// ======================================================
+// GENERADOR DE TICKETS (RECIBOS)
+// ======================================================
+window.generateTicket = function(id) {
+    const product = allProducts.find(p => p.id === id);
+    if (!product) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 500;
+    const ctx = canvas.getContext('2d');
+
+    // Fondo blanco
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Borde decorativo
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 10;
+    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+
+    // Texto Header
+    ctx.fillStyle = '#121212';
+    ctx.font = 'bold 36px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('mattEvan', canvas.width / 2, 70);
+
+    ctx.font = '16px Arial';
+    ctx.fillStyle = '#666666';
+    ctx.fillText('Comprobante de Venta', canvas.width / 2, 100);
+
+    // Separador
+    ctx.beginPath();
+    ctx.moveTo(30, 120);
+    ctx.lineTo(370, 120);
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Detalles del Producto
+    ctx.fillStyle = '#121212';
+    ctx.font = 'bold 22px Arial';
+    
+    // Función para envolver texto largo
+    function wrapText(context, text, x, y, maxWidth, lineHeight) {
+        const words = text.split(' ');
+        let line = '';
+        for(let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = context.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                context.fillText(line, x, y);
+                line = words[n] + ' ';
+                y += lineHeight;
+            } else {
+                line = testLine;
+            }
+        }
+        context.fillText(line, x, y);
+        return y;
+    }
+
+    let nextY = wrapText(ctx, product.nombre, canvas.width / 2, 160, 340, 30);
+
+    // Precio
+    ctx.font = 'bold 32px Arial';
+    ctx.fillStyle = '#ff007f';
+    ctx.fillText(`$${product.precio} MXN`, canvas.width / 2, nextY + 50);
+
+    // Separador
+    ctx.beginPath();
+    ctx.moveTo(30, nextY + 80);
+    ctx.lineTo(370, nextY + 80);
+    ctx.stroke();
+
+    // Footer
+    ctx.fillStyle = '#121212';
+    ctx.font = 'bold 24px Arial';
+    ctx.fillText('¡GRACIAS POR TU COMPRA!', canvas.width / 2, nextY + 130);
+    
+    const date = new Date().toLocaleDateString('es-MX');
+    ctx.font = '14px Arial';
+    ctx.fillStyle = '#666666';
+    ctx.fillText(`Fecha: ${date}`, canvas.width / 2, nextY + 160);
+
+    // Descargar
+    const link = document.createElement('a');
+    link.download = `Recibo_mattEvan_${product.nombre.substring(0, 10).replace(/[^a-z0-9]/gi, '_')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('Recibo generado 🧾');
 };
 
 // ======================================================
@@ -688,10 +791,21 @@ document.getElementById('config-form').addEventListener('submit', async (e) => {
 //  DASHBOARD METRICS
 // ======================================================
 function updateDashboard() {
-    document.getElementById('stat-total').textContent = allProducts.length;
-    document.getElementById('stat-disponibles').textContent = allProducts.filter(p => p.estado === 'Disponible' || !p.estado).length;
-    document.getElementById('stat-vendidos').textContent = allProducts.filter(p => p.estado === 'Vendido').length;
-    document.getElementById('stat-galeria').textContent = allGallery.length;
+    const total = allProducts.length;
+    const disponibles = allProducts.filter(p => p.estado === 'Disponible' || !p.estado).length;
+    const vendidos = allProducts.filter(p => p.estado === 'Vendido').length;
+    let ingresos = 0;
+    allProducts.forEach(p => {
+        if (p.estado === 'Vendido' && p.precio) {
+            ingresos += p.precio;
+        }
+    });
+
+    document.getElementById('stat-total').innerText = total;
+    document.getElementById('stat-disponibles').innerText = disponibles;
+    document.getElementById('stat-vendidos').innerText = vendidos;
+    document.getElementById('stat-galeria').innerText = allGallery.length;
+    document.getElementById('stat-ingresos').innerText = `$${ingresos.toLocaleString('es-MX')}`;
 
     // Category breakdown
     const breakdown = document.getElementById('cat-breakdown');
