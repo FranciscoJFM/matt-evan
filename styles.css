@@ -1172,28 +1172,40 @@ footer p {
 .screen.active { display: flex; animation: fadeIn 0.3s ease; }
 
 .cart-box {
-    background: var(--surface);
+    background: #1a1a2e;
     padding: 30px;
     border-radius: 20px;
     width: 90%;
     max-width: 500px;
     position: relative;
-    border: 1px solid rgba(0, 229, 255, 0.2);
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    border: 1px solid rgba(0, 229, 255, 0.25);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
     max-height: 90vh;
     overflow-y: auto;
+    color: #f0f0f0;
+}
+.cart-box h2 {
+    margin: 0 0 5px 0;
+    font-size: 1.5rem;
 }
 .close-modal {
     position: absolute;
     top: 15px;
     right: 15px;
-    background: none;
+    background: rgba(255,255,255,0.1);
     border: none;
-    color: var(--text-muted);
-    font-size: 1.5rem;
+    color: #f0f0f0;
+    font-size: 1.2rem;
     cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
 }
-.close-modal:hover { color: var(--red); }
+.close-modal:hover { background: rgba(255,68,68,0.4); color: white; }
 
 .cart-items {
     margin: 20px 0;

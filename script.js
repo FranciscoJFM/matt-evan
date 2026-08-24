@@ -161,11 +161,20 @@ async function loadCatalog() {
                 <div class="product-info">
                     <h3>${prod.nombre}</h3>
                     ${priceHtml}
-                    <button class="btn btn-primary product-interest w-100"
-                            data-nombre="${prod.nombre}"
-                            data-precio="${prod.precio}">
-                        Añadir al Carrito 🛒
-                    </button>
+                    <div style="display:flex; gap:8px; margin-top:10px;">
+                        <button class="btn btn-primary product-add-cart"
+                                data-nombre="${prod.nombre}"
+                                data-precio="${prod.precio}"
+                                style="flex:1;">
+                            🛒 Al Carrito
+                        </button>
+                        <button class="btn btn-secondary product-ask-wa"
+                                data-nombre="${prod.nombre}"
+                                data-precio="${prod.precio}"
+                                style="flex:1; white-space:nowrap;">
+                            <i class="fa-brands fa-whatsapp"></i> Preguntar
+                        </button>
+                    </div>
                 </div>
             `;
             container.appendChild(card);
@@ -173,6 +182,7 @@ async function loadCatalog() {
 
         setupFilters();
         setupProductCTAs();
+        setupCartModal();
     } catch (error) {
         console.error("Error cargando catálogo:", error);
         const container = $("#catalog-container");
@@ -304,22 +314,34 @@ function setupFilters() {
 let cart = [];
 
 function setupProductCTAs() {
-    $$(".product-interest").forEach(button => {
+    // Botón: Añadir al carrito
+    $$(".product-add-cart").forEach(button => {
         button.addEventListener("click", () => {
             const nombre = button.dataset.nombre;
             const precio = parseInt(button.dataset.precio, 10);
-            
+
             cart.push({ nombre, precio });
             updateCartUI();
-            
+
             // Animación de feedback
-            const originalText = button.innerHTML;
             button.innerHTML = "¡Añadido! ✅";
             button.style.background = "#25D366";
+            button.disabled = true;
             setTimeout(() => {
-                button.innerHTML = originalText;
+                button.innerHTML = "🛒 Al Carrito";
                 button.style.background = "";
+                button.disabled = false;
             }, 1500);
+        });
+    });
+
+    // Botón: Preguntar directo por WhatsApp
+    $$(".product-ask-wa").forEach(button => {
+        button.addEventListener("click", () => {
+            const nombre = button.dataset.nombre;
+            const precio = button.dataset.precio;
+            const text = `Hola, vi el *${nombre}* de $${precio} en mattEvan. ¿Todavía está disponible?`;
+            window.open(buildWhatsappUrl(text), "_blank", "noopener,noreferrer");
         });
     });
 }
@@ -369,44 +391,55 @@ window.removeFromCart = function(index) {
     updateCartUI();
 };
 
-// Eventos del Carrito Modal
-document.addEventListener("DOMContentLoaded", () => {
-    const modal = $("#cart-modal");
-    
-    $("#floating-cart-btn")?.addEventListener("click", () => {
+// Inicializar listeners del modal del carrito (se llama después de render)
+function setupCartModal() {
+    const modal = document.getElementById("cart-modal");
+    const floatingBtn = document.getElementById("floating-cart-btn");
+    const closeBtn = document.getElementById("close-cart-btn");
+    const sendBtn = document.getElementById("send-whatsapp-btn");
+
+    // Evitar duplicar listeners
+    floatingBtn?.addEventListener("click", () => {
+        renderCartModal();
         modal.classList.add("active");
     });
-    
-    $("#close-cart-btn")?.addEventListener("click", () => {
+
+    closeBtn?.addEventListener("click", () => {
         modal.classList.remove("active");
     });
-    
-    $("#send-whatsapp-btn")?.addEventListener("click", () => {
-        if (cart.length === 0) return;
-        
+
+    // Cerrar al hacer clic en el fondo oscuro
+    modal?.addEventListener("click", (e) => {
+        if (e.target === modal) modal.classList.remove("active");
+    });
+
+    sendBtn?.addEventListener("click", () => {
+        if (cart.length === 0) {
+            alert("¡Tu carrito está vacío! Añade algún producto primero.");
+            return;
+        }
+
         let text = "¡Hola mattEvan! Quiero pedir lo siguiente:\n\n";
         let total = 0;
         cart.forEach(item => {
             text += `👉 ${item.nombre} - $${item.precio}\n`;
             total += item.precio;
         });
-        
         text += `\n*Total a pagar: $${total} MXN*`;
-        
-        const comments = $("#cart-comments").value.trim();
+
+        const comments = document.getElementById("cart-comments").value.trim();
         if (comments) {
-            text += `\n\n*Comentarios adicionales:*\n${comments}`;
+            text += `\n\n*Comentarios:*\n${comments}`;
         }
-        
+
         window.open(buildWhatsappUrl(text), "_blank", "noopener,noreferrer");
-        
-        // Limpiar carrito
+
         cart = [];
-        $("#cart-comments").value = "";
+        document.getElementById("cart-comments").value = "";
         updateCartUI();
         modal.classList.remove("active");
     });
-});
+}
 
 // =========================================
 // INICIALIZAR TODO
