@@ -110,7 +110,13 @@ async function loadCatalog() {
         // Cargar productos
         const snap = await getDocs(collection(db, "productos"));
         const productos = [];
-        snap.forEach(d => productos.push(d.data()));
+        snap.forEach(d => {
+            const data = d.data();
+            // Filtrar los vendidos para que no aparezcan en la página pública
+            if (data.estado !== 'Vendido') {
+                productos.push(data);
+            }
+        });
 
         const container = $("#catalog-container");
         if (!container) return;
