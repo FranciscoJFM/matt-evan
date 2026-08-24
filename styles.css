@@ -1192,10 +1192,10 @@ footer p {
     position: absolute;
     top: 15px;
     right: 15px;
-    background: rgba(255,255,255,0.08) !important;
-    border: 1px solid rgba(255,255,255,0.15) !important;
-    color: #f0f0f0 !important;
-    font-size: 1.1rem;
+    background: rgba(255,255,255,0.12) !important;
+    border: 2px solid rgba(255,255,255,0.25) !important;
+    color: #ffffff !important;
+    font-size: 1rem;
     cursor: pointer;
     width: 36px;
     height: 36px;
@@ -1204,8 +1204,11 @@ footer p {
     align-items: center;
     justify-content: center;
     transition: all 0.2s;
+    line-height: 1;
 }
-.close-modal:hover { background: rgba(255,68,68,0.5) !important; }
+.close-modal i,
+.close-modal svg { color: #ffffff !important; }
+.close-modal:hover { background: rgba(220,50,50,0.6) !important; border-color: rgba(220,50,50,0.8) !important; }
 
 .cart-items {
     margin: 15px 0;
@@ -1223,21 +1226,25 @@ footer p {
 .cart-item-row h4 { margin: 0 0 3px 0; font-size: 0.95rem; color: #f0f0f0 !important; }
 .cart-item-row span { color: #00e5ff !important; font-size: 0.9rem; }
 .cart-item-remove {
-    background: rgba(255,68,68,0.15) !important;
-    border: 1px solid rgba(255,68,68,0.3) !important;
-    color: #ff6b6b !important;
-    font-size: 1rem;
+    background: rgba(220,50,50,0.2) !important;
+    border: 2px solid rgba(220,50,50,0.5) !important;
+    color: #ff8080 !important;
+    font-size: 0.9rem;
     cursor: pointer;
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     transition: all 0.2s;
+    line-height: 1;
 }
-.cart-item-remove:hover { background: rgba(255,68,68,0.4) !important; }
+.cart-item-remove i,
+.cart-item-remove svg { color: #ff8080 !important; }
+.cart-item-remove:hover { background: rgba(220,50,50,0.5) !important; color: #fff !important; }
+.cart-item-remove:hover i { color: #fff !important; }
 
 .cart-total {
     display: flex;
