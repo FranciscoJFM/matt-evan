@@ -129,15 +129,6 @@ async function loadCatalog() {
         let categorias = [];
         catSnap.forEach(d => categorias.push({ id: d.id, ...d.data() }));
 
-        // Si no hay categorías en Firebase, usamos las por defecto de la página
-        if (categorias.length === 0) {
-            categorias = [
-                { nombre: 'Garage / Bazar', slug: 'garage' },
-                { nombre: 'Personalizados', slug: 'custom' },
-                { nombre: 'Copias, Impresiones y Escáner', slug: 'copias-impresiones-escaner', icono: '🖨️' },
-                { nombre: 'Papelería', slug: 'papeleria' }
-            ];
-        }
         publicCategories = categorias.filter(c => c.activa !== false);
 
         const serviceSelect = $("#service");
@@ -154,6 +145,19 @@ async function loadCatalog() {
             publicCategories.forEach(c => {
                 filtersContainer.innerHTML += `<button class="filter-btn" data-filter="${escapeHtml(c.slug)}">${escapeHtml(c.icono || '')} ${escapeHtml(c.nombre)}</button>`;
             });
+        }
+
+        const servicesGrid = $("#dynamic-services-grid");
+        if (servicesGrid) {
+            servicesGrid.innerHTML = publicCategories.length > 0
+                ? publicCategories.map(category => `
+                    <div class="service-card reveal visible">
+                        <div class="service-icon">${escapeHtml(category.icono || '🏷️')}</div>
+                        <h3>${escapeHtml(category.nombre)}</h3>
+                        <p>${escapeHtml(category.descripcion || 'Consulta los productos y servicios disponibles en esta categoría.')}</p>
+                        <a href="#catalog" class="service-category-link" data-category-link="${escapeHtml(category.slug)}">Ver productos</a>
+                    </div>`).join('')
+                : '<p class="loading-text">Aún no hay categorías activas.</p>';
         }
 
         // Cargar productos (solo los disponibles o apartados con stock, los vendidos y agotados van al historial del admin)
@@ -351,6 +355,13 @@ function setupFilters() {
             $$(".filter-btn").forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
             applyFilters();
+        });
+    });
+
+    $$('[data-category-link]').forEach(link => {
+        link.addEventListener('click', () => {
+            const slug = link.dataset.categoryLink;
+            document.querySelector(`.filter-btn[data-filter="${CSS.escape(slug)}"]`)?.click();
         });
     });
 

@@ -35,6 +35,17 @@ function createOrderFolio() {
     return `ME-${day}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
+function getCategoryName(slug) {
+    return allCategories.find(category => category.slug === slug)?.nombre || slug || 'Sin categoría';
+}
+
+const DEFAULT_CATEGORIES = [
+    { nombre: 'Garage / Bazar', slug: 'garage', icono: '🏷️', descripcion: 'Productos nuevos, seminuevos y oportunidades de garage.', activa: true },
+    { nombre: 'Personalizados', slug: 'custom', icono: '🎨', descripcion: 'Tazas, playeras, stickers, gorras y artículos personalizados.', activa: true },
+    { nombre: 'Copias, Impresiones y Escáner', slug: 'copias-impresiones-escaner', icono: '🖨️', descripcion: 'Copias, impresiones a color o blanco y negro, digitalización y escáner.', activa: true },
+    { nombre: 'Papelería', slug: 'papeleria', icono: '✏️', descripcion: 'Artículos escolares, de oficina y papelería en general.', activa: true }
+];
+
 
 // ============ DOM ELEMENTS ============
 const loginScreen = document.getElementById('login-screen');
@@ -117,15 +128,17 @@ logoutBtn.addEventListener('click', () => {
 
 // ============ LOAD ALL DATA ============
 async function loadAll() {
+    // Las categorías son la fuente central; deben existir antes de cargar formularios y productos.
+    await loadCategories();
     await Promise.all([
         loadProducts(),
-        loadCategories(),
         loadEncargos(),
         loadNovedades(),
         loadPromos(),
         loadGallery(),
         loadConfig()
     ]);
+    await loadCategories(); // Actualiza los conteos una vez cargados los productos.
     updateDashboard();
 }
 
@@ -183,7 +196,7 @@ async function loadProducts() {
                 ${stockLabel}
                 <h3>${p.nombre}</h3>
                 ${priceHtml}
-                <p class="cat-label">${p.categoria || 'Sin categoría'}</p>
+                <p class="cat-label">${escapeHtml(getCategoryName(p.categoria))}</p>
                 <div class="card-actions">
                     <button class="btn-edit" onclick="editProduct('${p.id}')"><i class="fa-solid fa-pen"></i> Editar</button>
                     <button class="btn-delete" onclick="deleteProduct('${p.id}')"><i class="fa-solid fa-trash"></i> Eliminar</button>
@@ -196,17 +209,12 @@ async function loadProducts() {
 
 function showProductForm(product = null) {
     const isEdit = !!product;
-    
-    // Si no hay categorías creadas, usamos las base por defecto
-    let catsToUse = allCategories;
-    if (catsToUse.length === 0) {
-        catsToUse = [
-            { nombre: 'Garage / Bazar', slug: 'garage' },
-            { nombre: 'Personalizados', slug: 'custom' },
-            { nombre: 'Copias, Impresiones y Escáner', slug: 'copias-impresiones-escaner', icono: '🖨️' },
-            { nombre: 'Papelería', slug: 'papeleria' }
-        ];
+    if (!isEdit && allCategories.length === 0) {
+        toast('Primero crea al menos una categoría', true);
+        document.querySelector('[data-section="sec-categorias"]')?.click();
+        return;
     }
+    const catsToUse = allCategories;
     
     const catOptions = catsToUse.filter(c => c.activa !== false || product?.categoria === c.slug).map(c => `<option value="${escapeHtml(c.slug)}" ${product && product.categoria === c.slug ? 'selected' : ''}>${escapeHtml(c.nombre)}</option>`).join('');
 
@@ -417,7 +425,18 @@ document.getElementById('add-category-btn').addEventListener('click', () => show
 async function loadCategories() {
     const list = document.getElementById('admin-categories-list');
     list.innerHTML = '<p class="loading-text">Cargando...</p>';
-    const snap = await getDocs(collection(db, "categorias"));
+    let snap = await getDocs(collection(db, "categorias"));
+    if (snap.empty) {
+        const seedMarker = await getDoc(doc(db, "configuracion", "categorySeed"));
+        if (!seedMarker.exists()) {
+            const batch = writeBatch(db);
+            DEFAULT_CATEGORIES.forEach(category => batch.set(doc(db, "categorias", category.slug), category));
+            batch.set(doc(db, "configuracion", "categorySeed"), { completado: true, fecha: serverTimestamp() });
+            await batch.commit();
+            snap = await getDocs(collection(db, "categorias"));
+            toast('Categorías base sincronizadas ✅');
+        }
+    }
     allCategories = [];
     snap.forEach(d => allCategories.push({ id: d.id, ...d.data() }));
 
@@ -432,6 +451,7 @@ async function loadCategories() {
         <div class="list-item">
             <div class="list-item-info">
                 <h4>${escapeHtml(c.icono || '🏷️')} ${escapeHtml(c.nombre)} <span style="color:var(--text-muted);font-size:.8rem;">(${escapeHtml(c.slug)})</span></h4>
+                <p>${escapeHtml(c.descripcion || 'Sin descripción')}</p>
                 <p>${relatedCount} producto${relatedCount === 1 ? '' : 's'} · ${c.activa === false ? 'Oculta' : 'Visible'}</p>
             </div>
             <div class="list-item-actions">
@@ -504,7 +524,7 @@ window.deleteCategory = async function(id) {
         return;
     }
     if (!confirm(`¿Eliminar la categoría "${category.nombre}"?`)) return;
-    try { await deleteDoc(doc(db, "categorias", id)); toast('Categoría eliminada 🗑️'); await loadCategories(); } catch (err) { 
+    try { await deleteDoc(doc(db, "categorias", id)); toast('Categoría eliminada 🗑️'); await loadCategories(); updateDashboard(); } catch (err) {
         console.error(err);
         alert('Error exacto: ' + err.message);
         toast('Error', true); 
@@ -565,7 +585,7 @@ function renderEncargos() {
                 <p><strong>Pide:</strong> ${escapeHtml(e.producto)}</p>
                 <div class="kb-card-meta">
                     <span class="kb-chip">📞 ${escapeHtml(e.telefono || 'Sin tel.')}</span>
-                    ${e.categoria ? `<span class="kb-chip">${escapeHtml(e.categoria)}</span>` : ''}
+                    ${e.categoria ? `<span class="kb-chip">${escapeHtml(getCategoryName(e.categoria))}</span>` : ''}
                     ${e.fechaEntrega ? `<span class="kb-chip ${isLate ? 'due-late' : ''}">📅 ${escapeHtml(e.fechaEntrega)}</span>` : ''}
                     ${total ? `<span class="kb-chip">Total: $${total.toLocaleString('es-MX')}</span><span class="kb-chip">Saldo: $${saldo.toLocaleString('es-MX')}</span>` : ''}
                 </div>
@@ -1054,15 +1074,7 @@ function updateDashboard() {
 
     // Category breakdown
     const breakdown = document.getElementById('cat-breakdown');
-    let catsToUse = allCategories;
-    if (catsToUse.length === 0) {
-        catsToUse = [
-            { nombre: 'Garage / Bazar', slug: 'garage' },
-            { nombre: 'Personalizados', slug: 'custom' },
-            { nombre: 'Copias, Impresiones y Escáner', slug: 'copias-impresiones-escaner', icono: '🖨️' },
-            { nombre: 'Papelería', slug: 'papeleria' }
-        ];
-    }
+    const catsToUse = allCategories;
     breakdown.innerHTML = catsToUse.map(c => {
         const count = allProducts.filter(p => p.categoria === c.slug).length;
         return `<div class="cat-row"><span class="cat-name">${escapeHtml(c.icono || '')} ${escapeHtml(c.nombre)}</span><span class="cat-count">${count}</span></div>`;

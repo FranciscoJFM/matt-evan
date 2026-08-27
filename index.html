@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=4">
+    <link rel="stylesheet" href="styles.css?v=5">
     <link rel="icon" type="image/png" href="assets/Logo.png">
 </head>
 
@@ -107,25 +107,8 @@
     <section id="services" class="section bg-alt">
         <div class="container">
             <h2 class="section-title reveal">Nuestros Servicios</h2>
-            <div class="services-grid">
-                <!-- Bloque 1 -->
-                <div class="service-card reveal">
-                    <div class="service-icon">🎁</div>
-                    <h3>Personalizados</h3>
-                    <p>Tazas, playeras, cajas, stickers y más, con tu propio diseño único.</p>
-                </div>
-                <!-- Bloque 2 -->
-                <div class="service-card reveal">
-                    <div class="service-icon">🏷️</div>
-                    <h3>Garage & Bazar</h3>
-                    <p>Electrónica retro, juguetes, y artículos únicos listos para una segunda vida.</p>
-                </div>
-                <!-- Bloque 3 -->
-                <div class="service-card reveal">
-                    <div class="service-icon">🖨️</div>
-                    <h3>Impresiones & Copias</h3>
-                    <p>Copias, escáner, e impresiones a color. ¡Próximamente papelería!</p>
-                </div>
+            <div class="services-grid" id="dynamic-services-grid">
+                <p class="loading-text">Cargando servicios...</p>
             </div>
 
             <div class="other-services reveal">
@@ -269,11 +252,6 @@
                         <label for="service">¿Qué te interesa?</label>
                         <select id="service" required>
                             <option value="">Selecciona una opción...</option>
-                            <option value="Catálogo/Garage">Catálogo / Venta de Garage</option>
-                            <option value="Productos Personalizados">Productos Personalizados</option>
-                            <option value="Impresiones/Copias/Escáner">Copias / Impresiones / Escáner</option>
-                            <option value="Paginas Web">Creación de Páginas Web</option>
-                            <option value="Otro">Otro / Duda general</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -391,7 +369,7 @@
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script type="module" src="script.js?v=4"></script>
+    <script type="module" src="script.js?v=5"></script>
 </body>
 
 </html>
