@@ -1,6 +1,6 @@
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -17,12 +17,13 @@ const db = getFirestore(app);
 
 function createOrderFolio() {
     const day = new Date().toISOString().slice(0, 10).replaceAll('-', '');
-    return `ME-${day}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    return `ME-${day}-${crypto.randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 }
 
 async function createEncargo(cliente, telefono, producto, origen, details = {}) {
     const folio = createOrderFolio();
-    const reference = await addDoc(collection(db, "encargos"), {
+    const reference = doc(collection(db, "encargos"));
+    const orderData = {
         cliente,
         telefono,
         producto,
@@ -35,8 +36,18 @@ async function createEncargo(cliente, telefono, producto, origen, details = {}) 
         fechaEntrega: details.fechaEntrega || '',
         tipoEntrega: details.tipoEntrega || 'Por acordar',
         notas: details.notas || '',
+        items: Array.isArray(details.items) ? details.items : [],
+        archivo: details.archivo || '',
         creadoEn: serverTimestamp()
+    };
+    const batch = writeBatch(db);
+    batch.set(reference, orderData);
+    batch.set(doc(db, 'seguimiento', folio), {
+        folio, estado: 'Nuevo', fechaEntrega: details.fechaEntrega || '',
+        total: Number(details.total) || 0, pagado: 0, saldo: Number(details.total) || 0,
+        actualizadoEn: serverTimestamp()
     });
+    await batch.commit();
     return { reference, folio };
 }
 
@@ -136,6 +147,7 @@ async function loadCatalog() {
             serviceSelect.innerHTML = '<option value="">Selecciona una opción...</option>' + publicCategories.map(c =>
                 `<option value="${escapeHtml(c.slug)}">${escapeHtml(c.icono || '🏷️')} ${escapeHtml(c.nombre)}</option>`
             ).join('') + '<option value="otro">Otro / Pedido especial</option>';
+            serviceSelect.addEventListener('change', renderDynamicOrderFields);
         }
 
         // Generar filtros dinámicos
@@ -205,6 +217,8 @@ async function loadCatalog() {
                 priceHtml = `<p class="price"><span class="old-price">$${prod.precioViejo}</span> $${prod.precio} MXN</p>`;
                 discountBadge = `<span class="discount-badge">-${discount}%</span>`;
             }
+            const activeVariants = (prod.variantes || []).filter(variant => Number(variant.stock) > 0);
+            const variantsHtml = activeVariants.length ? `<select class="product-variant-select" aria-label="Seleccionar variante de ${escapeHtml(prod.nombre)}">${activeVariants.map((variant, index) => `<option value="${index}" data-name="${escapeHtml(variant.nombre)}" data-extra="${Number(variant.precioExtra) || 0}" data-stock="${Number(variant.stock)}">${escapeHtml(variant.nombre)}${Number(variant.precioExtra) ? ` (+$${Number(variant.precioExtra)})` : ''} · ${Number(variant.stock)} disponibles</option>`).join('')}</select>` : '';
 
             card.innerHTML = `
                 <div class="product-image-container">
@@ -217,6 +231,7 @@ async function loadCatalog() {
                     <h3>${escapeHtml(prod.nombre)}</h3>
                     ${prod.descripcion ? `<p class="product-description">${escapeHtml(prod.descripcion)}</p>` : ''}
                     ${priceHtml}
+                    ${variantsHtml}
                     <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
                         <button class="btn btn-primary product-add-cart"
                                 data-nombre="${escapeHtml(prod.nombre)}"
@@ -246,6 +261,30 @@ async function loadCatalog() {
         const container = $("#catalog-container");
         if (container) container.innerHTML = '<p style="text-align:center; width:100%;">No se pudieron cargar los productos.</p>';
     }
+}
+
+function renderDynamicOrderFields() {
+    const container = document.getElementById('dynamic-order-fields');
+    if (!container) return;
+    const category = publicCategories.find(item => item.slug === document.getElementById('service')?.value);
+    container.innerHTML = (category?.camposPedido || []).map((field, index) => `
+        <div class="form-group"><label for="dynamic-field-${index}">${escapeHtml(field)}</label>
+        <input type="text" id="dynamic-field-${index}" data-category-field="${escapeHtml(field)}" maxlength="150" required placeholder="Escribe ${escapeHtml(field.toLowerCase())}"></div>`).join('');
+}
+
+function getDynamicOrderDetails() {
+    return [...document.querySelectorAll('[data-category-field]')].map(input => `${input.dataset.categoryField}: ${input.value.trim()}`).filter(detail => !detail.endsWith(': ')).join('; ');
+}
+
+async function readSmallOrderFile(file) {
+    if (!file) return '';
+    if (file.size > 350 * 1024) throw new Error('El archivo no puede superar 350 KB.');
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+        reader.readAsDataURL(file);
+    });
 }
 
 // =========================================
@@ -399,15 +438,20 @@ function setupProductCTAs() {
         }
 
         button.addEventListener("click", () => {
-            const precio = Number(button.dataset.precio);
-            const id = button.dataset.id;
-            const stock = Number(button.dataset.stock) || 1;
-            const existing = cart.find(item => (item.id && item.id === id) || item.nombre === nombre);
+            const variantSelect = button.closest('.product-info')?.querySelector('.product-variant-select');
+            const variantOption = variantSelect?.selectedOptions[0];
+            const variantName = variantOption?.dataset.name || '';
+            const precio = Number(button.dataset.precio) + Number(variantOption?.dataset.extra || 0);
+            const productId = button.dataset.id;
+            const id = variantName ? `${productId}::${variantName}` : productId;
+            const itemName = variantName ? `${nombre} (${variantName})` : nombre;
+            const stock = Number(variantOption?.dataset.stock || button.dataset.stock) || 1;
+            const existing = cart.find(item => (item.id && item.id === id) || (!item.id && item.nombre === itemName));
             if (existing) {
                 if (existing.cantidad >= stock) { showToast(`Sólo hay ${stock} disponible${stock === 1 ? '' : 's'}.`); return; }
                 existing.cantidad += 1;
             } else {
-                cart.push({ id, nombre, precio, cantidad: 1, stock, categoria: button.dataset.categoria || '' });
+                cart.push({ id, productId, nombre: itemName, variante: variantName, precio, cantidad: 1, stock, categoria: button.dataset.categoria || '' });
             }
             saveCart();
             updateCartUI();
@@ -569,7 +613,8 @@ function setupCartModal() {
                 categoria: cart.length === 1 ? cart[0].categoria : 'varios',
                 notas: comments,
                 fechaEntrega,
-                tipoEntrega
+                tipoEntrega,
+                items: cart.map(item => ({ id: item.productId || item.id || '', nombre: item.nombre, variante: item.variante || '', precio: Number(item.precio), cantidad: Number(item.cantidad) }))
             });
             if (whatsappWindow) {
                 whatsappWindow.opener = null;
@@ -615,6 +660,22 @@ document.addEventListener('keydown', event => {
     if (event.key === 'Escape') document.getElementById('cart-modal')?.classList.remove('active');
 });
 
+document.getElementById('tracking-form')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const folio = document.getElementById('tracking-folio').value.trim().toUpperCase();
+    const result = document.getElementById('tracking-result');
+    result.hidden = false;
+    result.innerHTML = '<p>Consultando pedido...</p>';
+    try {
+        const snapshot = await getDoc(doc(db, 'seguimiento', folio));
+        if (!snapshot.exists()) { result.innerHTML = '<p>No encontramos ese folio. Revisa que esté escrito correctamente.</p>'; return; }
+        const data = snapshot.data();
+        result.innerHTML = `<h3>${escapeHtml(data.folio)}</h3><p><strong>Estado:</strong> ${escapeHtml(data.estado)}</p>
+            ${data.fechaEntrega ? `<p><strong>Entrega estimada:</strong> ${escapeHtml(data.fechaEntrega)}</p>` : ''}
+            <p><strong>Total:</strong> $${Number(data.total || 0).toLocaleString('es-MX')} · <strong>Pagado:</strong> $${Number(data.pagado || 0).toLocaleString('es-MX')} · <strong>Saldo:</strong> $${Number(data.saldo || 0).toLocaleString('es-MX')}</p>`;
+    } catch (error) { console.error(error); result.innerHTML = '<p>No se pudo consultar el pedido. Intenta nuevamente.</p>'; }
+});
+
 // =========================================
 // INICIALIZAR TODO
 // =========================================
@@ -654,19 +715,23 @@ if (form) {
         const message = $("#message").value.trim();
         const preferredDate = $("#preferred-date").value;
         const deliveryType = $("#delivery-type").value;
+        const categoryDetails = getDynamicOrderDetails();
+        const orderFile = $("#order-file").files[0];
         if (name.length < 2 || !isValidPhone(phone) || !service || message.length < 3) { showToast("Por favor completa todos los campos con datos válidos."); return; }
-        const text = `Hola, soy ${name}.\nVi la página de mattEvan.\n\nMe interesa: ${service}\n\nDetalle:\n${message}`;
+        const text = `Hola, soy ${name}.\nVi la página de mattEvan.\n\nMe interesa: ${service}\n${categoryDetails ? `\nEspecificaciones: ${categoryDetails}\n` : ''}\nDetalle:\n${message}`;
         const submitBtn = form.querySelector('button[type="submit"]');
         const whatsappWindow = window.open("about:blank", "_blank");
         submitBtn.disabled = true;
         submitBtn.textContent = "Registrando pedido...";
 
         try {
-            const { folio } = await createEncargo(name, phone, `${service}: ${message}`, "Formulario web", {
+            const encodedFile = await readSmallOrderFile(orderFile);
+            const { folio } = await createEncargo(name, phone, `${service}: ${categoryDetails ? categoryDetails + '. ' : ''}${message}`, "Formulario web", {
                 categoria: service,
-                notas: message,
+                notas: `${categoryDetails ? categoryDetails + '. ' : ''}${message}`,
                 fechaEntrega: preferredDate,
-                tipoEntrega: deliveryType
+                tipoEntrega: deliveryType,
+                archivo: encodedFile
             });
             if (whatsappWindow) {
                 whatsappWindow.opener = null;

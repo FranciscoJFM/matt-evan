@@ -11,7 +11,7 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'cliente', 'telefono', 'producto', 'estado', 'origen', 'folio',
           'categoria', 'total', 'anticipo', 'fechaEntrega', 'tipoEntrega',
-          'notas', 'creadoEn'
+          'notas', 'items', 'archivo', 'creadoEn'
         ])
         && request.resource.data.cliente is string
         && request.resource.data.cliente.size() >= 2
@@ -29,6 +29,10 @@ service cloud.firestore {
         && request.resource.data.tipoEntrega in ['Por acordar', 'Recoger', 'Punto medio', 'Envío']
         && request.resource.data.notas is string
         && request.resource.data.notas.size() <= 1500
+        && request.resource.data.items is list
+        && request.resource.data.items.size() <= 50
+        && request.resource.data.archivo is string
+        && request.resource.data.archivo.size() <= 500000
         && request.resource.data.estado == 'Nuevo'
         && request.resource.data.origen in ['Carrito web', 'Formulario web']
         && request.resource.data.folio is string
@@ -46,6 +50,21 @@ service cloud.firestore {
       match /pagos/{paymentId} {
         allow read, create, update, delete: if isAdmin();
       }
+    }
+
+    match /seguimiento/{folio} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if isAdmin() || (
+        request.resource.data.keys().hasOnly(['folio','estado','fechaEntrega','total','pagado','saldo','actualizadoEn'])
+        && request.resource.data.folio == folio
+        && folio.size() >= 20
+        && request.resource.data.estado == 'Nuevo'
+        && request.resource.data.pagado == 0
+        && request.resource.data.saldo == request.resource.data.total
+        && request.resource.data.actualizadoEn == request.time
+      );
+      allow update, delete: if isAdmin();
     }
 
     match /{collectionName}/{documentId} {

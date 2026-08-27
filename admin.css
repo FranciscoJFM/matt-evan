@@ -316,6 +316,8 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
     .section-header h2 { font-size: 1.3rem; }
     .content-section { padding: 20px; }
     .kanban-toolbar { grid-template-columns: 1fr; }
+    .agenda-grid { grid-template-columns: 1fr; }
+    .payments-summary { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
     .stats-cards { grid-template-columns: 1fr; }
@@ -385,7 +387,25 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
 .payment-row small { color: var(--text-muted); display: block; }
 .payment-row .payment-amount { color: var(--green); font-weight: 900; }
 .payment-row button { border: 0; background: transparent; color: var(--red); cursor: pointer; }
+.payment-actions { display: flex; gap: 5px; align-items: center; }
+.payment-actions button:first-child { color: var(--primary); }
+.payment-row.payment-cancelled { opacity: .6; text-decoration: line-through; }
+.payment-row.payment-cancelled .payment-amount { color: var(--red); }
 .payment-liquidated { padding: 13px; border: 1px solid rgba(0,230,118,.4); border-radius: 10px; color: var(--green); text-align: center; background: rgba(0,230,118,.08); }
+.agenda-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+.agenda-event, .customer-history-item, .report-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+.agenda-event small, .customer-history-item small, .report-row small { display: block; color: var(--text-muted); }
+.agenda-event.overdue strong { color: var(--red); }
+.agenda-event.today strong { color: var(--tertiary); }
+.operational-alerts { display: flex; flex-direction: column; gap: 8px; }
+.operational-alert { padding: 10px 12px; border-radius: 8px; background: var(--bg-input); border-left: 3px solid var(--primary); }
+.operational-alert.danger { border-left-color: var(--red); }
+.operational-alert.warning { border-left-color: var(--tertiary); }
+.admin-search { width: 100%; padding: 11px 14px; margin-bottom: 12px; color: var(--text-light); background: var(--bg-input); border: 1px solid var(--border); border-radius: 9px; }
+.report-card { margin-top: 18px; }
+.report-filters { display: flex; gap: 10px; margin-bottom: 12px; }
+.report-filters input, .report-filters select { padding: 9px 12px; color: var(--text-light); background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .kanban-col-header h3 {
     margin: 0;

@@ -16,11 +16,15 @@ Sitio público y panel administrativo para gestionar productos, categorías, ped
 ## Funciones principales
 
 - Categorías dinámicas relacionadas con productos.
-- Carrito con cantidades, stock y totales.
-- Pedidos con folio, estados, fecha de entrega, anticipo y saldo.
-- Historial de anticipos y abonos por pedido, con liquidación automática al llegar el saldo a cero.
+- Campos de pedido configurables por categoría, presentes en catálogo, productos y encargos.
+- Carrito con cantidades, variantes, stock y totales.
+- Pedidos con folio seguro, estados, fecha de entrega, modalidad de pago y saldo.
+- Historial auditable de anticipos y abonos, recibos, cancelación de movimientos y liquidación automática.
+- Acuerdos de pago de contado, parcialidades o crédito, con próxima fecha de cobro y alertas de vencimiento.
 - Kanban: nuevos, cotizados, producción, listos, entregados y cancelados.
-- Formulario público conectado a la colección `encargos`.
+- Entrega controlada: impide entregar con deuda salvo crédito autorizado y descuenta inventario una sola vez.
+- Agenda de entregas y cobros, historial por cliente y exportación CSV de pedidos y pagos.
+- Formulario público con archivo Base64 opcional y seguimiento por folio sin exponer los datos del cliente.
 - Configuración de WhatsApp y redes desde el administrador.
 - Imágenes comprimidas y guardadas como Base64 en Firestore, sin depender de Firebase Storage.
 
@@ -50,4 +54,4 @@ vercel
 
 ## Seguridad
 
-La página pública puede leer el catálogo y crear pedidos, pero no leer, modificar ni eliminar encargos. El panel requiere Firebase Authentication. Se recomienda activar Firebase App Check para reducir spam automatizado.
+La página pública puede leer el catálogo, crear pedidos y consultar únicamente el resumen sanitizado de un folio difícil de adivinar. No puede listar, leer, modificar ni eliminar encargos. El panel requiere Firebase Authentication y las escrituras administrativas están restringidas al UID autorizado. Se recomienda activar Firebase App Check para reducir spam automatizado.

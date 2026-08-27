@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mattevan Admin - MODO BESTIA</title>
-    <link rel="stylesheet" href="admin.css?v=6">
+    <link rel="stylesheet" href="admin.css?v=7">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
@@ -44,6 +44,9 @@
                 </button>
                 <button class="nav-item" data-section="sec-encargos">
                     <i class="fa-solid fa-clipboard-list"></i><span>Encargos</span>
+                </button>
+                <button class="nav-item" data-section="sec-agenda">
+                    <i class="fa-solid fa-calendar-check"></i><span>Agenda & Reportes</span>
                 </button>
                 <button class="nav-item" data-section="sec-novedades">
                     <i class="fa-solid fa-newspaper"></i><span>Novedades</span>
@@ -125,6 +128,10 @@
                 </div>
                 <div class="dashboard-grid">
                     <div class="dash-card">
+                        <h4>Alertas Operativas</h4>
+                        <div id="dashboard-alerts" class="operational-alerts"><p class="loading-text">Cargando alertas...</p></div>
+                    </div>
+                    <div class="dash-card">
                         <h4>Productos por Categoría</h4>
                         <div id="cat-breakdown" class="cat-breakdown"></div>
                     </div>
@@ -134,6 +141,32 @@
                         <button class="beast-btn-sm" onclick="document.querySelector('[data-section=sec-galeria]').click()"><i class="fa-solid fa-camera"></i> Subir Foto</button>
                         <button class="beast-btn-sm" onclick="document.querySelector('[data-section=sec-novedades]').click()"><i class="fa-solid fa-pen"></i> Editar Novedades</button>
                     </div>
+                </div>
+            </section>
+
+            <section class="content-section" id="sec-agenda">
+                <div class="section-header">
+                    <h2>📅 Agenda, Clientes y Reportes</h2>
+                    <div class="header-actions">
+                        <button id="export-orders-btn" class="beast-btn-sm"><i class="fa-solid fa-file-csv"></i> Pedidos CSV</button>
+                        <button id="export-payments-btn" class="beast-btn-sm"><i class="fa-solid fa-file-csv"></i> Pagos CSV</button>
+                    </div>
+                </div>
+                <div class="agenda-grid">
+                    <div class="dash-card"><h4>Entregas y cobros próximos</h4><div id="agenda-events"></div></div>
+                    <div class="dash-card">
+                        <h4>Historial por cliente</h4>
+                        <input type="search" id="customer-history-search" class="admin-search" placeholder="Nombre o teléfono del cliente...">
+                        <div id="customer-history-results"><p class="empty-state">Busca un cliente para consultar pedidos, pagos y deuda.</p></div>
+                    </div>
+                </div>
+                <div class="dash-card report-card">
+                    <h4>Movimientos de pago</h4>
+                    <div class="report-filters">
+                        <input type="date" id="payments-date-filter" aria-label="Filtrar pagos por fecha">
+                        <select id="payments-method-filter" aria-label="Filtrar pagos por método"><option value="all">Todos los métodos</option><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Depósito</option><option>Otro</option></select>
+                    </div>
+                    <div id="payments-report"></div>
                 </div>
             </section>
 
@@ -301,6 +334,6 @@
     <!-- TOAST -->
     <div id="admin-toast" class="admin-toast"></div>
 
-    <script type="module" src="admin.js?v=6"></script>
+    <script type="module" src="admin.js?v=7"></script>
 </body>
 </html>

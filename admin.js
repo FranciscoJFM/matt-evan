@@ -3,7 +3,7 @@
 // ============================================
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, getDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, getDoc, writeBatch, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBpEFLhubbnSpy5W3ziUpovZC-KN8RYtWQ",
@@ -33,10 +33,19 @@ function roundMoney(value) {
     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
+function calculateNextPaymentDate(currentDate, frequency) {
+    if (!currentDate || !frequency) return currentDate || '';
+    const date = new Date(`${currentDate}T12:00:00`);
+    if (frequency === 'Semanal') date.setDate(date.getDate() + 7);
+    if (frequency === 'Quincenal') date.setDate(date.getDate() + 15);
+    if (frequency === 'Mensual') date.setMonth(date.getMonth() + 1);
+    return localDateKey(date);
+}
+
 function createOrderFolio() {
     const date = new Date();
     const day = date.toISOString().slice(0, 10).replaceAll('-', '');
-    return `ME-${day}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    return `ME-${day}-${crypto.randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 }
 
 function getCategoryName(slug) {
@@ -44,10 +53,10 @@ function getCategoryName(slug) {
 }
 
 const DEFAULT_CATEGORIES = [
-    { nombre: 'Garage / Bazar', slug: 'garage', icono: '🏷️', descripcion: 'Productos nuevos, seminuevos y oportunidades de garage.', activa: true },
-    { nombre: 'Personalizados', slug: 'custom', icono: '🎨', descripcion: 'Tazas, playeras, stickers, gorras y artículos personalizados.', activa: true },
-    { nombre: 'Copias, Impresiones y Escáner', slug: 'copias-impresiones-escaner', icono: '🖨️', descripcion: 'Copias, impresiones a color o blanco y negro, digitalización y escáner.', activa: true },
-    { nombre: 'Papelería', slug: 'papeleria', icono: '✏️', descripcion: 'Artículos escolares, de oficina y papelería en general.', activa: true }
+    { nombre: 'Garage / Bazar', slug: 'garage', icono: '🏷️', descripcion: 'Productos nuevos, seminuevos y oportunidades de garage.', camposPedido: ['Cantidad', 'Forma de entrega'], activa: true },
+    { nombre: 'Personalizados', slug: 'custom', icono: '🎨', descripcion: 'Tazas, playeras, stickers, gorras y artículos personalizados.', camposPedido: ['Producto', 'Cantidad', 'Color', 'Talla o medida'], activa: true },
+    { nombre: 'Copias, Impresiones y Escáner', slug: 'copias-impresiones-escaner', icono: '🖨️', descripcion: 'Copias, impresiones a color o blanco y negro, digitalización y escáner.', camposPedido: ['Número de páginas', 'Cantidad de juegos', 'Tamaño', 'Color o blanco y negro'], activa: true },
+    { nombre: 'Papelería', slug: 'papeleria', icono: '✏️', descripcion: 'Artículos escolares, de oficina y papelería en general.', camposPedido: ['Artículo', 'Cantidad', 'Marca preferida'], activa: true }
 ];
 
 
@@ -239,6 +248,7 @@ function showProductForm(product = null) {
                 </select>
             </div>
             <div class="form-group"><label>Descripción (opcional)</label><textarea id="pf-desc" placeholder="Detalles del producto...">${product?.descripcion || ''}</textarea></div>
+            <div class="form-group"><label>Variantes (una por línea: Nombre | Precio extra | Stock)</label><textarea id="pf-variants" placeholder="Talla M | 0 | 5&#10;Talla G | 20 | 3">${(product?.variantes || []).map(variant => `${variant.nombre} | ${variant.precioExtra || 0} | ${variant.stock || 0}`).join('\n')}</textarea></div>
             <div class="form-group"><label>Archivo (Imagen o PDF)</label><input type="file" id="pf-img" accept="image/*,application/pdf">
                 ${product?.imagen && product.imagen.startsWith('data:image') ? `<img src="${product.imagen}" class="img-preview">` : ''}
                 ${product?.imagen && product.imagen.startsWith('data:application/pdf') ? `<p style="color:var(--tertiary); font-size: 0.9rem; margin-top:5px;"><i class="fa-solid fa-file-pdf"></i> PDF adjunto actual</p>` : ''}
@@ -262,6 +272,10 @@ function showProductForm(product = null) {
                 categoria: document.getElementById('pf-cat').value,
                 estado: document.getElementById('pf-status').value,
                 descripcion: document.getElementById('pf-desc').value,
+                variantes: document.getElementById('pf-variants').value.split('\n').map(line => {
+                    const [nombre, precioExtra, stock] = line.split('|').map(value => value?.trim());
+                    return { nombre, precioExtra: Number(precioExtra) || 0, stock: Math.max(0, Number(stock) || 0) };
+                }).filter(variant => variant.nombre),
             };
 
             const fileInput = document.getElementById('pf-img');
@@ -441,6 +455,21 @@ async function loadCategories() {
             toast('Categorías base sincronizadas ✅');
         }
     }
+    const fieldsMarker = await getDoc(doc(db, "configuracion", "categoryFieldsV1"));
+    if (!fieldsMarker.exists() && !snap.empty) {
+        const batch = writeBatch(db);
+        let hasUpdates = false;
+        snap.forEach(categoryDoc => {
+            const defaults = DEFAULT_CATEGORIES.find(category => category.slug === categoryDoc.data().slug);
+            if (defaults && !Array.isArray(categoryDoc.data().camposPedido)) {
+                batch.update(categoryDoc.ref, { camposPedido: defaults.camposPedido });
+                hasUpdates = true;
+            }
+        });
+        batch.set(doc(db, "configuracion", "categoryFieldsV1"), { completado: true, fecha: serverTimestamp() });
+        await batch.commit();
+        if (hasUpdates) snap = await getDocs(collection(db, "categorias"));
+    }
     allCategories = [];
     snap.forEach(d => allCategories.push({ id: d.id, ...d.data() }));
 
@@ -476,6 +505,7 @@ function showCategoryForm(cat = null) {
                 <div class="form-group"><label>Icono (emoji)</label><input type="text" id="cf-icon" maxlength="4" value="${cat?.icono || '🏷️'}"></div>
             </div>
             <div class="form-group"><label>Descripción</label><textarea id="cf-description" placeholder="Describe los productos o servicios de esta categoría">${cat?.descripcion || ''}</textarea></div>
+            <div class="form-group"><label>Campos para pedidos (separados por coma)</label><input type="text" id="cf-fields" value="${escapeHtml((cat?.camposPedido || []).join(', '))}" placeholder="Ej. Tamaño, Color, Cantidad, Acabado"></div>
             <div class="form-group"><label><input type="checkbox" id="cf-active" ${cat?.activa !== false ? 'checked' : ''}> Visible en catálogo y formulario de pedidos</label></div>
             <button type="submit" class="beast-btn" style="width:100%">${isEdit ? 'ACTUALIZAR' : 'GUARDAR'} 🏷️</button>
         </form>
@@ -487,6 +517,7 @@ function showCategoryForm(cat = null) {
             slug: slugify(document.getElementById('cf-slug').value),
             icono: document.getElementById('cf-icon').value.trim() || '🏷️',
             descripcion: document.getElementById('cf-description').value.trim(),
+            camposPedido: document.getElementById('cf-fields').value.split(',').map(field => field.trim()).filter(Boolean).slice(0, 12),
             activa: document.getElementById('cf-active').checked
         };
         if (!data.slug) { toast('El slug no es válido', true); return; }
@@ -542,9 +573,47 @@ let allEncargos = [];
 document.getElementById('add-encargo-btn').addEventListener('click', () => showEncargoForm());
 document.getElementById('encargos-search')?.addEventListener('input', renderEncargos);
 document.getElementById('encargos-status-filter')?.addEventListener('change', renderEncargos);
+document.getElementById('customer-history-search')?.addEventListener('input', renderCustomerHistory);
+document.getElementById('payments-date-filter')?.addEventListener('change', renderPaymentsReport);
+document.getElementById('payments-method-filter')?.addEventListener('change', renderPaymentsReport);
+document.getElementById('export-orders-btn')?.addEventListener('click', exportOrdersCsv);
+document.getElementById('export-payments-btn')?.addEventListener('click', exportPaymentsCsv);
 
 function normalizeOrderStatus(status) {
     return ({ Pendiente: 'Nuevo', Conseguido: 'Listo', Creado: 'Listo' })[status] || status || 'Nuevo';
+}
+
+async function completeOrderDelivery(orderId) {
+    await runTransaction(db, async transaction => {
+        const orderRef = doc(db, 'encargos', orderId);
+        const orderSnap = await transaction.get(orderRef);
+        if (!orderSnap.exists()) throw new Error('El pedido ya no existe.');
+        const orderData = orderSnap.data();
+        const items = Array.isArray(orderData.items) ? orderData.items.filter(item => item.id && Number(item.cantidad) > 0) : [];
+        const productSnapshots = [];
+        if (!orderData.inventarioAplicado) {
+            for (const item of items) {
+                const productRef = doc(db, 'productos', item.id);
+                productSnapshots.push({ item, productRef, snapshot: await transaction.get(productRef) });
+            }
+        }
+        productSnapshots.forEach(({ item, productRef, snapshot }) => {
+            if (!snapshot.exists()) return;
+            const productData = snapshot.data();
+            if (item.variante && Array.isArray(productData.variantes)) {
+                const variants = productData.variantes.map(variant => variant.nombre === item.variante
+                    ? { ...variant, stock: Math.max(0, Number(variant.stock || 0) - Number(item.cantidad)) }
+                    : variant);
+                const totalStock = variants.reduce((sum, variant) => sum + Number(variant.stock || 0), 0);
+                transaction.update(productRef, { variantes: variants, cantidad: totalStock, estado: totalStock === 0 ? 'Vendido' : (productData.estado || 'Disponible') });
+            } else {
+                const currentStock = Number(productData.cantidad ?? 0);
+                const newStock = Math.max(0, currentStock - Number(item.cantidad));
+                transaction.update(productRef, { cantidad: newStock, estado: newStock === 0 ? 'Vendido' : (productData.estado || 'Disponible') });
+            }
+        });
+        transaction.update(orderRef, { estado: 'Entregado', inventarioAplicado: true, entregadoEn: serverTimestamp(), actualizadoEn: serverTimestamp() });
+    });
 }
 
 async function loadEncargos() {
@@ -556,15 +625,114 @@ async function loadEncargos() {
         order.pagos = [];
         paymentsSnap.forEach(payment => order.pagos.push({ id: payment.id, ...payment.data() }));
         order.pagos.sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
-        const historyTotal = roundMoney(order.pagos.reduce((sum, payment) => sum + Number(payment.monto || 0), 0));
-        order.pagadoCalculado = order.pagos.length > 0
+        const activePayments = order.pagos.filter(payment => !payment.cancelado);
+        const historyTotal = roundMoney(activePayments.reduce((sum, payment) => sum + Number(payment.monto || 0), 0));
+        order.pagadoCalculado = activePayments.length > 0
             ? historyTotal
             : Number(order.pagado ?? order.anticipo ?? 0);
         order.saldoCalculado = Math.max(0, roundMoney(Number(order.total || order.precio || 0) - order.pagadoCalculado));
     }));
     allEncargos.sort((a, b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0));
+    await syncTrackingOrders(allEncargos);
     renderEncargos();
+    renderOperationalViews();
     setupKanbanDropZones();
+}
+
+async function syncTrackingOrders(orders) {
+    const eligible = orders.filter(order => order.folio && order.folio.split('-').pop().length >= 8);
+    if (!eligible.length) return;
+    const batch = writeBatch(db);
+    eligible.forEach(order => batch.set(doc(db, 'seguimiento', order.folio), {
+        folio: order.folio,
+        estado: normalizeOrderStatus(order.estado),
+        fechaEntrega: order.fechaEntrega || '',
+        total: Number(order.total || 0),
+        pagado: Number(order.pagadoCalculado || 0),
+        saldo: Number(order.saldoCalculado || 0),
+        actualizadoEn: serverTimestamp()
+    }, { merge: true }));
+    await batch.commit();
+}
+
+function localDateKey(date = new Date()) {
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function getPaymentRows() {
+    return allEncargos.flatMap(order => (order.pagos || []).map(payment => ({ order, payment })));
+}
+
+function renderOperationalViews() {
+    const today = localDateKey();
+    const active = allEncargos.filter(order => !['Entregado', 'Cancelado'].includes(normalizeOrderStatus(order.estado)));
+    const newOrders = active.filter(order => normalizeOrderStatus(order.estado) === 'Nuevo').length;
+    const overdueDeliveries = active.filter(order => order.fechaEntrega && order.fechaEntrega < today).length;
+    const overduePayments = active.filter(order => Number(order.saldoCalculado || 0) > 0 && order.proximoPago && order.proximoPago < today).length;
+    const ready = active.filter(order => normalizeOrderStatus(order.estado) === 'Listo').length;
+    const alerts = document.getElementById('dashboard-alerts');
+    if (alerts) alerts.innerHTML = [
+        newOrders ? `<div class="operational-alert">🆕 ${newOrders} pedido${newOrders === 1 ? '' : 's'} nuevo${newOrders === 1 ? '' : 's'} sin revisar</div>` : '',
+        overdueDeliveries ? `<div class="operational-alert danger">⚠️ ${overdueDeliveries} entrega${overdueDeliveries === 1 ? '' : 's'} vencida${overdueDeliveries === 1 ? '' : 's'}</div>` : '',
+        overduePayments ? `<div class="operational-alert danger">💳 ${overduePayments} pago${overduePayments === 1 ? '' : 's'} vencido${overduePayments === 1 ? '' : 's'}</div>` : '',
+        ready ? `<div class="operational-alert warning">📦 ${ready} pedido${ready === 1 ? '' : 's'} listo${ready === 1 ? '' : 's'} por entregar</div>` : ''
+    ].filter(Boolean).join('') || '<div class="operational-alert">✅ Sin alertas pendientes</div>';
+
+    const events = active.flatMap(order => [
+        ...(order.fechaEntrega ? [{ date: order.fechaEntrega, type: 'Entrega', order }] : []),
+        ...(Number(order.saldoCalculado || 0) > 0 && order.proximoPago ? [{ date: order.proximoPago, type: 'Cobro', order }] : [])
+    ]).sort((a, b) => a.date.localeCompare(b.date));
+    const agenda = document.getElementById('agenda-events');
+    if (agenda) agenda.innerHTML = events.length ? events.map(event => {
+        const cssClass = event.date < today ? 'overdue' : event.date === today ? 'today' : '';
+        return `<div class="agenda-event ${cssClass}"><div><strong>${event.type === 'Entrega' ? '📦' : '💳'} ${escapeHtml(event.type)} · ${escapeHtml(event.order.cliente)}</strong><small>${escapeHtml(event.order.folio || '')} · ${escapeHtml(event.order.producto)}</small></div><span>${escapeHtml(event.date)}</span></div>`;
+    }).join('') : '<p class="empty-state">No hay entregas o cobros programados.</p>';
+    renderPaymentsReport();
+    renderCustomerHistory();
+}
+
+function renderCustomerHistory() {
+    const container = document.getElementById('customer-history-results');
+    if (!container) return;
+    const search = document.getElementById('customer-history-search')?.value.toLowerCase().trim() || '';
+    if (search.length < 2) { container.innerHTML = '<p class="empty-state">Busca un cliente para consultar pedidos, pagos y deuda.</p>'; return; }
+    const orders = allEncargos.filter(order => `${order.cliente || ''} ${order.telefono || ''}`.toLowerCase().includes(search));
+    const totalPurchased = orders.reduce((sum, order) => sum + Number(order.total || 0), 0);
+    const totalPaid = orders.reduce((sum, order) => sum + Number(order.pagadoCalculado || 0), 0);
+    container.innerHTML = orders.length ? `<p><strong>${orders.length} pedidos · Comprado $${totalPurchased.toLocaleString('es-MX')} · Pagado $${totalPaid.toLocaleString('es-MX')} · Deuda $${Math.max(0, totalPurchased - totalPaid).toLocaleString('es-MX')}</strong></p>` + orders.map(order =>
+        `<div class="customer-history-item"><div><strong>${escapeHtml(order.folio || 'Sin folio')} · ${escapeHtml(order.producto)}</strong><small>${escapeHtml(normalizeOrderStatus(order.estado))} · ${order.pagos.filter(payment => !payment.cancelado).length} pagos</small></div><span>Saldo $${Number(order.saldoCalculado || 0).toLocaleString('es-MX')}</span></div>`
+    ).join('') : '<p class="empty-state">No se encontraron pedidos.</p>';
+}
+
+function renderPaymentsReport() {
+    const container = document.getElementById('payments-report');
+    if (!container) return;
+    const dateFilter = document.getElementById('payments-date-filter')?.value || '';
+    const methodFilter = document.getElementById('payments-method-filter')?.value || 'all';
+    const rows = getPaymentRows().filter(({ payment }) => {
+        const date = payment.fecha?.toDate ? localDateKey(payment.fecha.toDate()) : '';
+        return (!dateFilter || date === dateFilter) && (methodFilter === 'all' || payment.metodo === methodFilter);
+    });
+    const activeTotal = rows.filter(row => !row.payment.cancelado).reduce((sum, row) => sum + Number(row.payment.monto || 0), 0);
+    container.innerHTML = `<p><strong>Total filtrado: $${activeTotal.toLocaleString('es-MX')} MXN</strong></p>` + (rows.length ? rows.map(({ order, payment }) =>
+        `<div class="report-row ${payment.cancelado ? 'payment-cancelled' : ''}"><div><strong>${escapeHtml(order.cliente)} · ${escapeHtml(payment.metodo || '')}</strong><small>${escapeHtml(order.folio || '')} · ${escapeHtml(payment.nota || 'Sin referencia')}</small></div><span>${payment.cancelado ? 'Cancelado' : '$' + Number(payment.monto).toLocaleString('es-MX')}</span></div>`
+    ).join('') : '<p class="empty-state">No hay movimientos con estos filtros.</p>');
+}
+
+function downloadCsv(filename, rows) {
+    const csv = rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }));
+    link.download = filename; link.click(); URL.revokeObjectURL(link.href);
+}
+
+function exportOrdersCsv() {
+    downloadCsv(`pedidos-mattevan-${localDateKey()}.csv`, [['Folio','Cliente','Teléfono','Producto','Estado','Total','Pagado','Saldo','Entrega','Próximo pago'], ...allEncargos.map(order => [order.folio, order.cliente, order.telefono, order.producto, normalizeOrderStatus(order.estado), order.total, order.pagadoCalculado, order.saldoCalculado, order.fechaEntrega, order.proximoPago])]);
+}
+
+function exportPaymentsCsv() {
+    downloadCsv(`pagos-mattevan-${localDateKey()}.csv`, [['Folio','Cliente','Fecha','Método','Referencia','Importe','Estado'], ...getPaymentRows().map(({ order, payment }) => [order.folio, order.cliente, payment.fecha?.toDate ? payment.fecha.toDate().toLocaleString('es-MX') : '', payment.metodo, payment.nota, payment.monto, payment.cancelado ? 'Cancelado' : 'Aplicado'])]);
 }
 
 function renderEncargos() {
@@ -592,6 +760,7 @@ function renderEncargos() {
         const saldo = Math.max(0, roundMoney(total - paid));
         const paymentStatus = total > 0 && saldo === 0 ? 'Liquidado' : paid > 0 ? 'Pago parcial' : 'Sin anticipo';
         const isLate = e.fechaEntrega && new Date(`${e.fechaEntrega}T23:59:59`) < new Date() && !['Entregado', 'Cancelado'].includes(status);
+        const paymentOverdue = saldo > 0 && e.proximoPago && new Date(`${e.proximoPago}T23:59:59`) < new Date();
         card.innerHTML = `
             <div class="kb-card-header">
                 <h4><i class="fa-solid fa-user"></i> ${escapeHtml(e.cliente)}</h4>
@@ -603,12 +772,14 @@ function renderEncargos() {
                     <span class="kb-chip">📞 ${escapeHtml(e.telefono || 'Sin tel.')}</span>
                     ${e.categoria ? `<span class="kb-chip">${escapeHtml(getCategoryName(e.categoria))}</span>` : ''}
                     ${e.fechaEntrega ? `<span class="kb-chip ${isLate ? 'due-late' : ''}">📅 ${escapeHtml(e.fechaEntrega)}</span>` : ''}
+                    ${e.proximoPago ? `<span class="kb-chip ${paymentOverdue ? 'due-late' : ''}">💳 Próximo pago: ${escapeHtml(e.proximoPago)}</span>` : ''}
                     ${total ? `<span class="kb-chip">Total: $${total.toLocaleString('es-MX')}</span><span class="kb-chip">Pagado: $${paid.toLocaleString('es-MX')}</span><span class="kb-chip ${saldo === 0 ? 'paid-off' : ''}">${paymentStatus}: $${saldo.toLocaleString('es-MX')}</span>` : ''}
                 </div>
             </div>
             <div class="kb-card-actions">
                 ${e.telefono ? `<button class="btn-whatsapp" onclick="contactEncargo('${e.id}')" title="Contactar por WhatsApp" aria-label="Contactar por WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
                 <button class="btn-payment" onclick="manageEncargoPayments('${e.id}')" title="Anticipos y abonos" aria-label="Administrar anticipos y abonos"><i class="fa-solid fa-wallet"></i></button>
+                ${e.archivo ? `<button onclick="openOrderFile('${e.id}')" title="Ver archivo del cliente" aria-label="Ver archivo del cliente"><i class="fa-solid fa-paperclip"></i></button>` : ''}
                 <button onclick="printEncargo('${e.id}')" title="Imprimir cotización" aria-label="Imprimir cotización"><i class="fa-solid fa-file-invoice-dollar"></i></button>
                 <button class="btn-edit" onclick="editEncargo('${e.id}')"><i class="fa-solid fa-pen"></i></button>
                 <button class="btn-delete" onclick="deleteEncargo('${e.id}')"><i class="fa-solid fa-trash"></i></button>
@@ -662,11 +833,26 @@ function setupKanbanDropZones() {
                 
                 // Actualizar en Firebase
                 try {
-                    await updateDoc(doc(db, "encargos", id), { estado: newStatus });
+                    const enc = allEncargos.find(x => x.id === id);
+                    if (newStatus === 'Entregado' && Number(enc?.saldoCalculado || 0) > 0) {
+                        if (!enc?.creditoAutorizado) {
+                            toast('No se puede entregar: registra el saldo o autoriza crédito', true);
+                            window.manageEncargoPayments(id);
+                            renderEncargos();
+                            return;
+                        }
+                        if (!confirm(`Se entregará con saldo pendiente de $${Number(enc.saldoCalculado).toLocaleString('es-MX')}. ¿Continuar con crédito autorizado?`)) { renderEncargos(); return; }
+                    }
+                    if (newStatus === 'Entregado') {
+                        await completeOrderDelivery(id);
+                        await loadProducts();
+                    } else {
+                        await updateDoc(doc(db, "encargos", id), { estado: newStatus, actualizadoEn: serverTimestamp() });
+                    }
                     
                     // Actualizar estado en memoria
-                    const enc = allEncargos.find(x => x.id === id);
                     if (enc) enc.estado = newStatus;
+                    if (enc) await syncTrackingOrders([enc]);
                     
                     renderEncargos();
                     toast('Estado actualizado a ' + newStatus);
@@ -708,6 +894,23 @@ function showEncargoForm(encargo = null) {
                     <option value="Envío" ${encargo?.tipoEntrega === 'Envío' ? 'selected' : ''}>Envío</option>
                 </select></div>
             </div>
+            <div class="form-row">
+                <div class="form-group"><label>Acuerdo de pago</label><select id="ef-modalidad-pago">
+                    <option value="Contado" ${encargo?.modalidadPago === 'Contado' ? 'selected' : ''}>Pago de contado</option>
+                    <option value="Parcialidades" ${encargo?.modalidadPago === 'Parcialidades' ? 'selected' : ''}>Parcialidades</option>
+                    <option value="Crédito" ${encargo?.modalidadPago === 'Crédito' ? 'selected' : ''}>Crédito autorizado</option>
+                </select></div>
+                <div class="form-group"><label>Próximo pago</label><input type="date" id="ef-proximo-pago" value="${escapeHtml(encargo?.proximoPago || '')}"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>Número de parcialidades</label><input type="number" id="ef-parcialidades" min="1" max="60" value="${Number(encargo?.numeroParcialidades || 1)}"></div>
+                <div class="form-group"><label>Frecuencia</label><select id="ef-frecuencia">
+                    <option value="">No aplica</option><option value="Semanal" ${encargo?.frecuenciaPago === 'Semanal' ? 'selected' : ''}>Semanal</option>
+                    <option value="Quincenal" ${encargo?.frecuenciaPago === 'Quincenal' ? 'selected' : ''}>Quincenal</option>
+                    <option value="Mensual" ${encargo?.frecuenciaPago === 'Mensual' ? 'selected' : ''}>Mensual</option>
+                </select></div>
+            </div>
+            <div class="form-group"><label><input type="checkbox" id="ef-credito-autorizado" ${encargo?.creditoAutorizado ? 'checked' : ''}> Autorizar entrega aunque exista saldo pendiente</label></div>
             <div class="form-group"><label>Notas internas</label><textarea id="ef-notas" placeholder="Diseño, materiales, medidas o acuerdos">${escapeHtml(encargo?.notas || '')}</textarea></div>
             <div class="form-group"><label>Estado</label>
                 <select id="ef-estado">
@@ -737,6 +940,11 @@ function showEncargoForm(encargo = null) {
                 total: Number(document.getElementById('ef-total').value) || 0,
                 fechaEntrega: document.getElementById('ef-fecha-entrega').value,
                 tipoEntrega: document.getElementById('ef-entrega').value,
+                modalidadPago: document.getElementById('ef-modalidad-pago').value,
+                proximoPago: document.getElementById('ef-proximo-pago').value,
+                numeroParcialidades: Number(document.getElementById('ef-parcialidades').value) || 1,
+                frecuenciaPago: document.getElementById('ef-frecuencia').value,
+                creditoAutorizado: document.getElementById('ef-credito-autorizado').checked,
                 notas: document.getElementById('ef-notas').value.trim(),
                 estado: document.getElementById('ef-estado').value,
                 actualizadoEn: serverTimestamp()
@@ -745,7 +953,13 @@ function showEncargoForm(encargo = null) {
             if (initialPayment > data.total) throw new Error('El pago no puede ser mayor que el total.');
             if (isEdit && Number(encargo.pagadoCalculado || 0) > data.total) throw new Error('El total no puede ser menor que lo ya pagado.');
             if (isEdit) {
+                const wantsDelivery = data.estado === 'Entregado';
+                const resultingBalance = Math.max(0, roundMoney(data.total - Number(encargo.pagadoCalculado || 0)));
+                if (wantsDelivery && resultingBalance > 0 && !data.creditoAutorizado) throw new Error('No puedes entregar con saldo pendiente sin autorizar crédito.');
+                if (wantsDelivery && resultingBalance > 0 && !confirm(`¿Entregar con crédito y saldo pendiente de $${resultingBalance.toLocaleString('es-MX')}?`)) throw new Error('Entrega cancelada.');
+                if (wantsDelivery) data.estado = normalizeOrderStatus(encargo.estado);
                 await updateDoc(doc(db, "encargos", encargo.id), data);
+                if (wantsDelivery) { await completeOrderDelivery(encargo.id); await loadProducts(); }
                 toast('Encargo actualizado ✅');
             } else {
                 data.folio = createOrderFolio();
@@ -777,6 +991,12 @@ function showEncargoForm(encargo = null) {
 }
 
 window.editEncargo = function(id) { const e = allEncargos.find(x => x.id === id); if (e) showEncargoForm(e); };
+window.openOrderFile = function(id) {
+    const order = allEncargos.find(item => item.id === id);
+    if (!order?.archivo) return;
+    const fileWindow = window.open();
+    if (fileWindow) fileWindow.location.href = order.archivo;
+};
 window.manageEncargoPayments = function(id) {
     const order = allEncargos.find(item => item.id === id);
     if (!order) return;
@@ -789,10 +1009,10 @@ window.manageEncargoPayments = function(id) {
         ...order.pagos
     ].map(payment => {
         const date = payment.fecha?.toDate ? payment.fecha.toDate().toLocaleString('es-MX') : payment.legacy ? 'Registro anterior' : 'Fecha pendiente';
-        return `<div class="payment-row">
+        return `<div class="payment-row ${payment.cancelado ? 'payment-cancelled' : ''}">
             <div><strong>${escapeHtml(payment.metodo || 'No especificado')}</strong><small>${escapeHtml(payment.nota || 'Sin nota')} · ${escapeHtml(date)}</small></div>
-            <span class="payment-amount">+$${Number(payment.monto || 0).toLocaleString('es-MX')}</span>
-            ${payment.legacy ? '<span title="Se migrará al registrar el siguiente pago">Histórico</span>' : `<button type="button" onclick="deleteEncargoPayment('${order.id}','${payment.id}')" title="Eliminar movimiento" aria-label="Eliminar movimiento"><i class="fa-solid fa-trash"></i></button>`}
+            <span class="payment-amount">${payment.cancelado ? 'Cancelado' : '+' + '$' + Number(payment.monto || 0).toLocaleString('es-MX')}</span>
+            <span class="payment-actions">${payment.legacy ? '<span title="Se migrará al registrar el siguiente pago">Histórico</span>' : `<button type="button" onclick="printPaymentReceipt('${order.id}','${payment.id}')" title="Imprimir recibo" aria-label="Imprimir recibo"><i class="fa-solid fa-receipt"></i></button>${payment.cancelado ? '' : `<button type="button" onclick="cancelEncargoPayment('${order.id}','${payment.id}')" title="Cancelar movimiento" aria-label="Cancelar movimiento"><i class="fa-solid fa-ban"></i></button>`}`}</span>
         </div>`;
     }).join('');
 
@@ -840,7 +1060,9 @@ window.manageEncargoPayments = function(id) {
             const newBalance = Math.max(0, roundMoney(total - newPaid));
             batch.update(doc(db, "encargos", order.id), {
                 pagado: newPaid, anticipo: newPaid, saldo: newBalance,
-                estadoPago: newBalance === 0 ? 'Liquidado' : 'Pago parcial', actualizadoEn: serverTimestamp()
+                estadoPago: newBalance === 0 ? 'Liquidado' : 'Pago parcial',
+                proximoPago: newBalance === 0 ? '' : calculateNextPaymentDate(order.proximoPago, order.frecuenciaPago),
+                actualizadoEn: serverTimestamp()
             });
             await batch.commit();
             toast(newBalance === 0 ? 'Pedido liquidado ✅' : 'Abono registrado ✅');
@@ -854,24 +1076,46 @@ window.manageEncargoPayments = function(id) {
     });
 };
 
-window.deleteEncargoPayment = async function(orderId, paymentId) {
+window.cancelEncargoPayment = async function(orderId, paymentId) {
     const order = allEncargos.find(item => item.id === orderId);
     const payment = order?.pagos.find(item => item.id === paymentId);
-    if (!order || !payment || !confirm(`¿Eliminar el pago de $${Number(payment.monto).toLocaleString('es-MX')}?`)) return;
+    if (!order || !payment) return;
+    const reason = prompt(`Motivo para cancelar el pago de $${Number(payment.monto).toLocaleString('es-MX')}:`);
+    if (!reason?.trim()) return;
     try {
         const total = Number(order.total || order.precio || 0);
         const newPaid = Math.max(0, roundMoney(Number(order.pagadoCalculado || 0) - Number(payment.monto || 0)));
         const newBalance = Math.max(0, roundMoney(total - newPaid));
         const batch = writeBatch(db);
-        batch.delete(doc(db, "encargos", orderId, "pagos", paymentId));
+        batch.update(doc(db, "encargos", orderId, "pagos", paymentId), {
+            cancelado: true, motivoCancelacion: reason.trim(), canceladoEn: serverTimestamp()
+        });
         batch.update(doc(db, "encargos", orderId), {
             pagado: newPaid, anticipo: newPaid, saldo: newBalance,
             estadoPago: newPaid === 0 ? 'Sin anticipo' : newBalance === 0 ? 'Liquidado' : 'Pago parcial', actualizadoEn: serverTimestamp()
         });
         await batch.commit();
-        toast('Movimiento eliminado');
+        toast('Movimiento cancelado y conservado en auditoría');
         await loadEncargos(); window.manageEncargoPayments(orderId); updateDashboard();
     } catch (error) { console.error(error); toast('No se pudo eliminar el movimiento', true); }
+};
+
+window.printPaymentReceipt = function(orderId, paymentId) {
+    const order = allEncargos.find(item => item.id === orderId);
+    const payment = order?.pagos.find(item => item.id === paymentId);
+    if (!order || !payment) return;
+    const paymentsBefore = order.pagos.filter(item => !item.cancelado && (item.fecha?.seconds || 0) <= (payment.fecha?.seconds || 0));
+    const paidAfter = roundMoney(paymentsBefore.reduce((sum, item) => sum + Number(item.monto || 0), 0));
+    const total = Number(order.total || 0);
+    const paidBefore = Math.max(0, roundMoney(paidAfter - Number(payment.monto || 0)));
+    const receiptWindow = window.open('', '_blank', 'width=620,height=760');
+    if (!receiptWindow) { toast('Permite ventanas emergentes para imprimir', true); return; }
+    receiptWindow.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Recibo ${escapeHtml(order.folio || '')}</title><style>body{font-family:Arial;margin:40px;color:#222}header{border-bottom:4px solid #00bcd4;margin-bottom:25px}table{width:100%;border-collapse:collapse}td{padding:12px;border-bottom:1px solid #ddd}td:last-child{text-align:right;font-weight:bold}@media print{button{display:none}}</style></head><body>
+        <header><h1>mattEvan</h1><p>Recibo de pago · ${escapeHtml(order.folio || '')}</p></header><p><strong>Cliente:</strong> ${escapeHtml(order.cliente)}</p>
+        <table><tr><td>Saldo anterior</td><td>$${Math.max(0, total - paidBefore).toLocaleString('es-MX')}</td></tr><tr><td>Pago recibido (${escapeHtml(payment.metodo || '')})</td><td>$${Number(payment.monto).toLocaleString('es-MX')}</td></tr><tr><td>Nuevo saldo</td><td>$${Math.max(0, total - paidAfter).toLocaleString('es-MX')}</td></tr></table>
+        <p><strong>Referencia:</strong> ${escapeHtml(payment.nota || 'Sin referencia')}</p><p>Fecha: ${escapeHtml(payment.fecha?.toDate ? payment.fecha.toDate().toLocaleString('es-MX') : new Date().toLocaleString('es-MX'))}</p>
+        <button onclick="window.print()">Imprimir / Guardar PDF</button></body></html>`);
+    receiptWindow.document.close();
 };
 
 window.contactEncargo = function(id) {
@@ -879,9 +1123,18 @@ window.contactEncargo = function(id) {
     if (!order?.telefono) return;
     const phone = order.telefono.replace(/\D/g, '');
     const status = normalizeOrderStatus(order.estado);
-    const message = status === 'Listo'
-        ? `Hola ${order.cliente}, tu pedido ${order.folio || ''} de mattEvan ya está listo para entregar.`
-        : `Hola ${order.cliente}, te contactamos de mattEvan sobre tu pedido ${order.folio || ''}: ${order.producto}.`;
+    const overduePayment = Number(order.saldoCalculado || 0) > 0 && order.proximoPago && order.proximoPago < localDateKey();
+    const messages = {
+        Nuevo: `Hola ${order.cliente}, recibimos tu pedido ${order.folio || ''} en mattEvan. En breve lo revisaremos.`,
+        Cotizado: `Hola ${order.cliente}, la cotización de tu pedido ${order.folio || ''} está lista. Total: $${Number(order.total || 0).toLocaleString('es-MX')} MXN.`,
+        Produccion: `Hola ${order.cliente}, tu pedido ${order.folio || ''} ya está en producción.`,
+        Listo: `Hola ${order.cliente}, tu pedido ${order.folio || ''} de mattEvan ya está listo para entregar. Saldo: $${Number(order.saldoCalculado || 0).toLocaleString('es-MX')} MXN.`,
+        Entregado: `Hola ${order.cliente}, gracias por tu compra. Tu pedido ${order.folio || ''} fue entregado.`,
+        Cancelado: `Hola ${order.cliente}, te contactamos sobre la cancelación del pedido ${order.folio || ''}.`
+    };
+    const message = overduePayment
+        ? `Hola ${order.cliente}, te recordamos que el pago de tu pedido ${order.folio || ''} está pendiente. Saldo: $${Number(order.saldoCalculado).toLocaleString('es-MX')} MXN. Fecha acordada: ${order.proximoPago}.`
+        : messages[status] || `Hola ${order.cliente}, te contactamos de mattEvan sobre tu pedido ${order.folio || ''}.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
 };
 window.printEncargo = function(id) {
