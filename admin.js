@@ -29,6 +29,10 @@ function slugify(value = '') {
         .toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+function roundMoney(value) {
+    return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
 function createOrderFolio() {
     const date = new Date();
     const day = date.toISOString().slice(0, 10).replaceAll('-', '');
@@ -547,6 +551,17 @@ async function loadEncargos() {
     const snap = await getDocs(collection(db, "encargos"));
     allEncargos = [];
     snap.forEach(d => allEncargos.push({ id: d.id, ...d.data() }));
+    await Promise.all(allEncargos.map(async order => {
+        const paymentsSnap = await getDocs(collection(db, "encargos", order.id, "pagos"));
+        order.pagos = [];
+        paymentsSnap.forEach(payment => order.pagos.push({ id: payment.id, ...payment.data() }));
+        order.pagos.sort((a, b) => (b.fecha?.seconds || 0) - (a.fecha?.seconds || 0));
+        const historyTotal = roundMoney(order.pagos.reduce((sum, payment) => sum + Number(payment.monto || 0), 0));
+        order.pagadoCalculado = order.pagos.length > 0
+            ? historyTotal
+            : Number(order.pagado ?? order.anticipo ?? 0);
+        order.saldoCalculado = Math.max(0, roundMoney(Number(order.total || order.precio || 0) - order.pagadoCalculado));
+    }));
     allEncargos.sort((a, b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0));
     renderEncargos();
     setupKanbanDropZones();
@@ -573,8 +588,9 @@ function renderEncargos() {
         card.dataset.id = e.id;
         
         const total = Number(e.total || e.precio || 0);
-        const anticipo = Number(e.anticipo || 0);
-        const saldo = Math.max(0, total - anticipo);
+        const paid = Number(e.pagadoCalculado || 0);
+        const saldo = Math.max(0, roundMoney(total - paid));
+        const paymentStatus = total > 0 && saldo === 0 ? 'Liquidado' : paid > 0 ? 'Pago parcial' : 'Sin anticipo';
         const isLate = e.fechaEntrega && new Date(`${e.fechaEntrega}T23:59:59`) < new Date() && !['Entregado', 'Cancelado'].includes(status);
         card.innerHTML = `
             <div class="kb-card-header">
@@ -587,11 +603,12 @@ function renderEncargos() {
                     <span class="kb-chip">📞 ${escapeHtml(e.telefono || 'Sin tel.')}</span>
                     ${e.categoria ? `<span class="kb-chip">${escapeHtml(getCategoryName(e.categoria))}</span>` : ''}
                     ${e.fechaEntrega ? `<span class="kb-chip ${isLate ? 'due-late' : ''}">📅 ${escapeHtml(e.fechaEntrega)}</span>` : ''}
-                    ${total ? `<span class="kb-chip">Total: $${total.toLocaleString('es-MX')}</span><span class="kb-chip">Saldo: $${saldo.toLocaleString('es-MX')}</span>` : ''}
+                    ${total ? `<span class="kb-chip">Total: $${total.toLocaleString('es-MX')}</span><span class="kb-chip">Pagado: $${paid.toLocaleString('es-MX')}</span><span class="kb-chip ${saldo === 0 ? 'paid-off' : ''}">${paymentStatus}: $${saldo.toLocaleString('es-MX')}</span>` : ''}
                 </div>
             </div>
             <div class="kb-card-actions">
                 ${e.telefono ? `<button class="btn-whatsapp" onclick="contactEncargo('${e.id}')" title="Contactar por WhatsApp" aria-label="Contactar por WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
+                <button class="btn-payment" onclick="manageEncargoPayments('${e.id}')" title="Anticipos y abonos" aria-label="Administrar anticipos y abonos"><i class="fa-solid fa-wallet"></i></button>
                 <button onclick="printEncargo('${e.id}')" title="Imprimir cotización" aria-label="Imprimir cotización"><i class="fa-solid fa-file-invoice-dollar"></i></button>
                 <button class="btn-edit" onclick="editEncargo('${e.id}')"><i class="fa-solid fa-pen"></i></button>
                 <button class="btn-delete" onclick="deleteEncargo('${e.id}')"><i class="fa-solid fa-trash"></i></button>
@@ -680,7 +697,7 @@ function showEncargoForm(encargo = null) {
             <div class="form-group"><label>Producto o servicio</label><textarea id="ef-producto" required placeholder="Ej. 20 copias a color, tamaño carta">${escapeHtml(encargo?.producto || '')}</textarea></div>
             <div class="form-row">
                 <div class="form-group"><label>Total (MXN)</label><input type="number" id="ef-total" min="0" step="0.01" value="${Number(encargo?.total || encargo?.precio || 0) || ''}"></div>
-                <div class="form-group"><label>Anticipo (MXN)</label><input type="number" id="ef-anticipo" min="0" step="0.01" value="${Number(encargo?.anticipo || 0) || ''}"></div>
+                <div class="form-group"><label>${isEdit ? 'Pagado (se modifica en Historial)' : 'Anticipo inicial (MXN)'}</label><input type="number" id="ef-anticipo" min="0" step="0.01" value="${Number(encargo?.pagadoCalculado ?? encargo?.anticipo ?? 0) || ''}" ${isEdit ? 'readonly' : ''}></div>
             </div>
             <div class="form-row">
                 <div class="form-group"><label>Fecha de entrega</label><input type="date" id="ef-fecha-entrega" value="${escapeHtml(encargo?.fechaEntrega || '')}"></div>
@@ -718,14 +735,15 @@ function showEncargoForm(encargo = null) {
                 telefono: document.getElementById('ef-telefono').value.trim(),
                 categoria: document.getElementById('ef-categoria').value,
                 total: Number(document.getElementById('ef-total').value) || 0,
-                anticipo: Number(document.getElementById('ef-anticipo').value) || 0,
                 fechaEntrega: document.getElementById('ef-fecha-entrega').value,
                 tipoEntrega: document.getElementById('ef-entrega').value,
                 notas: document.getElementById('ef-notas').value.trim(),
                 estado: document.getElementById('ef-estado').value,
                 actualizadoEn: serverTimestamp()
             };
-            if (data.anticipo > data.total && data.total > 0) throw new Error('El anticipo no puede ser mayor que el total.');
+            const initialPayment = Number(document.getElementById('ef-anticipo').value) || 0;
+            if (initialPayment > data.total) throw new Error('El pago no puede ser mayor que el total.');
+            if (isEdit && Number(encargo.pagadoCalculado || 0) > data.total) throw new Error('El total no puede ser menor que lo ya pagado.');
             if (isEdit) {
                 await updateDoc(doc(db, "encargos", encargo.id), data);
                 toast('Encargo actualizado ✅');
@@ -733,7 +751,18 @@ function showEncargoForm(encargo = null) {
                 data.folio = createOrderFolio();
                 data.origen = 'Administrador';
                 data.creadoEn = serverTimestamp();
-                await addDoc(collection(db, "encargos"), data);
+                data.anticipo = initialPayment;
+                data.pagado = initialPayment;
+                data.saldo = Math.max(0, roundMoney(data.total - initialPayment));
+                data.estadoPago = data.total > 0 && data.saldo === 0 ? 'Liquidado' : initialPayment > 0 ? 'Pago parcial' : 'Sin anticipo';
+                const orderRef = doc(collection(db, "encargos"));
+                const batch = writeBatch(db);
+                batch.set(orderRef, data);
+                if (initialPayment > 0) {
+                    const paymentRef = doc(collection(db, "encargos", orderRef.id, "pagos"));
+                    batch.set(paymentRef, { monto: initialPayment, metodo: 'No especificado', nota: 'Anticipo inicial', fecha: serverTimestamp() });
+                }
+                await batch.commit();
                 toast('Encargo creado ✅');
             }
             closeModal();
@@ -748,6 +777,103 @@ function showEncargoForm(encargo = null) {
 }
 
 window.editEncargo = function(id) { const e = allEncargos.find(x => x.id === id); if (e) showEncargoForm(e); };
+window.manageEncargoPayments = function(id) {
+    const order = allEncargos.find(item => item.id === id);
+    if (!order) return;
+    const total = Number(order.total || order.precio || 0);
+    const paid = Number(order.pagadoCalculado || 0);
+    const balance = Math.max(0, roundMoney(total - paid));
+    const legacyPayment = order.pagos.length === 0 && paid > 0;
+    const paymentRows = [
+        ...(legacyPayment ? [{ id: '', monto: paid, metodo: 'No especificado', nota: 'Anticipo registrado anteriormente', legacy: true }] : []),
+        ...order.pagos
+    ].map(payment => {
+        const date = payment.fecha?.toDate ? payment.fecha.toDate().toLocaleString('es-MX') : payment.legacy ? 'Registro anterior' : 'Fecha pendiente';
+        return `<div class="payment-row">
+            <div><strong>${escapeHtml(payment.metodo || 'No especificado')}</strong><small>${escapeHtml(payment.nota || 'Sin nota')} · ${escapeHtml(date)}</small></div>
+            <span class="payment-amount">+$${Number(payment.monto || 0).toLocaleString('es-MX')}</span>
+            ${payment.legacy ? '<span title="Se migrará al registrar el siguiente pago">Histórico</span>' : `<button type="button" onclick="deleteEncargoPayment('${order.id}','${payment.id}')" title="Eliminar movimiento" aria-label="Eliminar movimiento"><i class="fa-solid fa-trash"></i></button>`}
+        </div>`;
+    }).join('');
+
+    openModal(`PAGOS · ${order.folio || order.cliente}`, `
+        <div class="payments-summary">
+            <div class="payment-summary-card"><span>Total</span><strong>$${total.toLocaleString('es-MX')}</strong></div>
+            <div class="payment-summary-card"><span>Pagado</span><strong>$${paid.toLocaleString('es-MX')}</strong></div>
+            <div class="payment-summary-card"><span>Saldo</span><strong>$${balance.toLocaleString('es-MX')}</strong></div>
+        </div>
+        <h3>Historial de movimientos</h3>
+        <div class="payments-list">${paymentRows || '<p class="empty-state">Aún no hay anticipos ni abonos.</p>'}</div>
+        ${total > 0 && balance > 0 ? `<form id="payment-form">
+            <div class="form-row">
+                <div class="form-group"><label>Importe del abono</label><input type="number" id="payment-amount" min="0.01" max="${balance}" step="0.01" required></div>
+                <div class="form-group"><label>Método</label><select id="payment-method">
+                    <option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia</option>
+                    <option value="Tarjeta">Tarjeta</option><option value="Depósito">Depósito</option><option value="Otro">Otro</option>
+                </select></div>
+            </div>
+            <div class="form-group"><label>Nota o referencia</label><input type="text" id="payment-note" maxlength="200" placeholder="Ej. Transferencia 4582"></div>
+            <button type="submit" class="beast-btn" style="width:100%"><i class="fa-solid fa-plus"></i> Registrar abono</button>
+        </form>` : total > 0 ? '<p class="payment-liquidated">✅ Pedido liquidado. El historial se conserva.</p>' : '<p class="empty-state">Define primero el total del pedido para registrar pagos.</p>'}
+    `);
+
+    document.getElementById('payment-form')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        const button = event.target.querySelector('button[type="submit"]');
+        const amount = Number(document.getElementById('payment-amount').value);
+        if (!amount || amount <= 0 || amount > balance) { toast('El importe no es válido', true); return; }
+        button.disabled = true; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registrando...';
+        try {
+            const batch = writeBatch(db);
+            if (legacyPayment) {
+                const legacyRef = doc(collection(db, "encargos", order.id, "pagos"));
+                batch.set(legacyRef, { monto: paid, metodo: 'No especificado', nota: 'Anticipo migrado del registro anterior', fecha: serverTimestamp() });
+            }
+            const paymentRef = doc(collection(db, "encargos", order.id, "pagos"));
+            batch.set(paymentRef, {
+                monto: amount,
+                metodo: document.getElementById('payment-method').value,
+                nota: document.getElementById('payment-note').value.trim(),
+                fecha: serverTimestamp()
+            });
+            const newPaid = roundMoney(paid + amount);
+            const newBalance = Math.max(0, roundMoney(total - newPaid));
+            batch.update(doc(db, "encargos", order.id), {
+                pagado: newPaid, anticipo: newPaid, saldo: newBalance,
+                estadoPago: newBalance === 0 ? 'Liquidado' : 'Pago parcial', actualizadoEn: serverTimestamp()
+            });
+            await batch.commit();
+            toast(newBalance === 0 ? 'Pedido liquidado ✅' : 'Abono registrado ✅');
+            await loadEncargos();
+            window.manageEncargoPayments(order.id);
+            updateDashboard();
+        } catch (error) {
+            console.error(error); toast('No se pudo registrar el abono', true);
+            button.disabled = false; button.textContent = 'Intentar de nuevo';
+        }
+    });
+};
+
+window.deleteEncargoPayment = async function(orderId, paymentId) {
+    const order = allEncargos.find(item => item.id === orderId);
+    const payment = order?.pagos.find(item => item.id === paymentId);
+    if (!order || !payment || !confirm(`¿Eliminar el pago de $${Number(payment.monto).toLocaleString('es-MX')}?`)) return;
+    try {
+        const total = Number(order.total || order.precio || 0);
+        const newPaid = Math.max(0, roundMoney(Number(order.pagadoCalculado || 0) - Number(payment.monto || 0)));
+        const newBalance = Math.max(0, roundMoney(total - newPaid));
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "encargos", orderId, "pagos", paymentId));
+        batch.update(doc(db, "encargos", orderId), {
+            pagado: newPaid, anticipo: newPaid, saldo: newBalance,
+            estadoPago: newPaid === 0 ? 'Sin anticipo' : newBalance === 0 ? 'Liquidado' : 'Pago parcial', actualizadoEn: serverTimestamp()
+        });
+        await batch.commit();
+        toast('Movimiento eliminado');
+        await loadEncargos(); window.manageEncargoPayments(orderId); updateDashboard();
+    } catch (error) { console.error(error); toast('No se pudo eliminar el movimiento', true); }
+};
+
 window.contactEncargo = function(id) {
     const order = allEncargos.find(x => x.id === id);
     if (!order?.telefono) return;
@@ -762,7 +888,8 @@ window.printEncargo = function(id) {
     const order = allEncargos.find(x => x.id === id);
     if (!order) return;
     const total = Number(order.total || 0);
-    const advance = Number(order.anticipo || 0);
+    const advance = Number(order.pagadoCalculado ?? order.pagado ?? order.anticipo ?? 0);
+    const paymentHistory = (order.pagos || []).map(payment => `<tr><td>${escapeHtml(payment.metodo || 'Pago')}<br><small>${escapeHtml(payment.nota || '')}</small></td><td class="money">$${Number(payment.monto || 0).toLocaleString('es-MX')} MXN</td></tr>`).join('');
     const printWindow = window.open('', '_blank', 'width=760,height=820');
     if (!printWindow) { toast('Permite ventanas emergentes para imprimir', true); return; }
     printWindow.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${escapeHtml(order.folio || 'Cotización')}</title>
@@ -770,7 +897,7 @@ window.printEncargo = function(id) {
         <header><h1>mattEvan</h1><p>Cotización / Pedido <strong>${escapeHtml(order.folio || '')}</strong></p></header>
         <p><strong>Cliente:</strong> ${escapeHtml(order.cliente)}</p><p><strong>Teléfono:</strong> ${escapeHtml(order.telefono || '')}</p>
         <table><tr><td>${escapeHtml(order.producto)}</td><td class="money">$${total.toLocaleString('es-MX')} MXN</td></tr>
-        <tr><td>Anticipo</td><td class="money">$${advance.toLocaleString('es-MX')} MXN</td></tr>
+        ${paymentHistory || `<tr><td>Pagado / anticipo</td><td class="money">$${advance.toLocaleString('es-MX')} MXN</td></tr>`}
         <tr class="total"><td>Saldo pendiente</td><td class="money">$${Math.max(0, total - advance).toLocaleString('es-MX')} MXN</td></tr></table>
         ${order.fechaEntrega ? `<p><strong>Entrega estimada:</strong> ${escapeHtml(order.fechaEntrega)}</p>` : ''}
         <footer>Gracias por confiar en mattEvan. Los tiempos comienzan después de confirmar diseño y anticipo.</footer>
@@ -779,7 +906,13 @@ window.printEncargo = function(id) {
 };
 window.deleteEncargo = async function(id) {
     if (!confirm('¿Eliminar este encargo?')) return;
-    try { await deleteDoc(doc(db, "encargos", id)); toast('Encargo eliminado 🗑️'); await loadEncargos(); } catch (err) { 
+    try {
+        const order = allEncargos.find(item => item.id === id);
+        const batch = writeBatch(db);
+        (order?.pagos || []).forEach(payment => batch.delete(doc(db, "encargos", id, "pagos", payment.id)));
+        batch.delete(doc(db, "encargos", id));
+        await batch.commit(); toast('Encargo eliminado 🗑️'); await loadEncargos();
+    } catch (err) {
         console.error(err);
         alert('Error exacto: ' + err.message);
         toast('Error', true); 
@@ -1056,12 +1189,9 @@ function updateDashboard() {
     });
     const activeOrders = allEncargos.filter(e => !['Entregado', 'Cancelado'].includes(normalizeOrderStatus(e.estado)));
     const readyOrders = allEncargos.filter(e => normalizeOrderStatus(e.estado) === 'Listo');
-    const deliveredOrdersIncome = allEncargos
-        .filter(e => normalizeOrderStatus(e.estado) === 'Entregado')
-        .reduce((sum, e) => sum + Number(e.total || 0), 0);
-    const pendingBalances = activeOrders.reduce((sum, e) =>
-        sum + Math.max(0, Number(e.total || 0) - Number(e.anticipo || 0)), 0);
-    ingresos += deliveredOrdersIncome;
+    const ordersPaymentsIncome = allEncargos.reduce((sum, e) => sum + Number(e.pagadoCalculado || 0), 0);
+    const pendingBalances = activeOrders.reduce((sum, e) => sum + Number(e.saldoCalculado ?? Math.max(0, Number(e.total || 0) - Number(e.anticipo || 0))), 0);
+    ingresos += ordersPaymentsIncome;
 
     document.getElementById('stat-total').innerText = total;
     document.getElementById('stat-disponibles').innerText = disponibles;

@@ -372,8 +372,20 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
 .kb-card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .kb-chip { padding: 3px 7px; border-radius: 10px; background: var(--bg-input); color: var(--text-muted); font-size: .72rem; }
 .kb-chip.due-late { color: var(--red); border: 1px solid rgba(255,68,68,.4); }
+.kb-chip.paid-off { color: var(--green); border: 1px solid rgba(0,230,118,.4); }
 .kb-card-folio { color: var(--tertiary); font-weight: 800; font-size: .78rem; }
 .kb-card-actions .btn-whatsapp:hover { color: var(--green); }
+.kb-card-actions .btn-payment:hover { color: var(--tertiary); }
+.payments-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+.payment-summary-card { padding: 12px; border-radius: 10px; background: var(--bg-input); text-align: center; }
+.payment-summary-card span { display: block; color: var(--text-muted); font-size: .75rem; }
+.payment-summary-card strong { display: block; margin-top: 4px; font-size: 1.05rem; }
+.payments-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; max-height: 230px; overflow-y: auto; }
+.payment-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 12px; background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 9px; }
+.payment-row small { color: var(--text-muted); display: block; }
+.payment-row .payment-amount { color: var(--green); font-weight: 900; }
+.payment-row button { border: 0; background: transparent; color: var(--red); cursor: pointer; }
+.payment-liquidated { padding: 13px; border: 1px solid rgba(0,230,118,.4); border-radius: 10px; color: var(--green); text-align: center; background: rgba(0,230,118,.08); }
 
 .kanban-col-header h3 {
     margin: 0;

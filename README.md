@@ -18,6 +18,7 @@ Sitio público y panel administrativo para gestionar productos, categorías, ped
 - Categorías dinámicas relacionadas con productos.
 - Carrito con cantidades, stock y totales.
 - Pedidos con folio, estados, fecha de entrega, anticipo y saldo.
+- Historial de anticipos y abonos por pedido, con liquidación automática al llegar el saldo a cero.
 - Kanban: nuevos, cotizados, producción, listos, entregados y cancelados.
 - Formulario público conectado a la colección `encargos`.
 - Configuración de WhatsApp y redes desde el administrador.
