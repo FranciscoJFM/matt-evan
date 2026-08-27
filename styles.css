@@ -209,6 +209,9 @@ body {
     flex-direction: column;
     gap: 6px;
     cursor: pointer;
+    padding: 8px;
+    border: 0;
+    background: transparent;
 }
 
 .hamburger span {
@@ -727,6 +730,8 @@ body {
 .form-group {
     margin-bottom: 25px;
 }
+
+.form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 
 .form-group label {
     display: block;
@@ -1447,5 +1452,24 @@ footer p {
 .product-add-cart.in-cart {
     background: #25D366 !important;
     color: white !important;
-    cursor: default;
+    cursor: pointer;
+}
+
+.cart-quantity { display: flex; align-items: center; gap: 9px; margin-top: 8px; }
+.cart-quantity button {
+    width: 30px; height: 30px; border: 1px solid rgba(0,229,255,.45);
+    border-radius: 7px; background: rgba(0,229,255,.1); color: #fff;
+    cursor: pointer; font-size: 1rem;
+}
+.product-description { color: var(--text-muted); font-size: .9rem; margin-top: 6px; }
+.privacy-note { margin-top: 10px; color: var(--text-muted); font-size: .78rem; text-align: center; }
+.order-confirmation { margin-top: 12px; padding: 12px; border: 1px solid rgba(0,230,118,.45); border-radius: 10px; background: rgba(0,230,118,.1); color: #8dffbd !important; text-align: center; font-weight: 700; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    .cursor-glow { display: none; }
+}
+
+@media (max-width: 560px) {
+    .form-row { grid-template-columns: 1fr; gap: 0; }
 }

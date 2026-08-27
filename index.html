@@ -6,12 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mattEvan - Personalizamos tus ideas</title>
     <meta name="description"
-        content="mattEvan: Productos personalizados, oportunidades de garage y próximamente impresión, copias, escaneo y papelería.">
+        content="mattEvan: productos personalizados, tazas, playeras, stickers, gorras, copias, impresiones, escáner, papelería y oportunidades de garage.">
+    <meta name="theme-color" content="#0a0f1a">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="mattEvan - Personalizamos tus ideas">
+    <meta property="og:description" content="Crea tu pedido de personalizados, copias, impresiones, escáner, papelería y productos de garage.">
+    <meta property="og:image" content="assets/Logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=3">
     <link rel="icon" type="image/png" href="assets/Logo.png">
 </head>
 
@@ -34,13 +39,13 @@
                 <li><a href="#services">Servicios</a></li>
                 <li><a href="#gallery">Galería</a></li>
                 <li><a href="#faq">FAQ</a></li>
-                <li><a href="#contact">Contacto</a></li>
+                <li><a href="#contact">Crear pedido</a></li>
             </ul>
-            <div class="hamburger">
+            <button class="hamburger" type="button" aria-label="Abrir menú" aria-expanded="false">
                 <span></span>
                 <span></span>
                 <span></span>
-            </div>
+            </button>
         </div>
     </nav>
 
@@ -57,7 +62,7 @@
             </p>
             <div class="hero-buttons">
                 <a href="#catalog" class="btn btn-primary">Ver Productos</a>
-                <a href="#contact" class="btn btn-secondary">Cotizar por WhatsApp</a>
+                <a href="#contact" class="btn btn-secondary">Crear pedido personalizado</a>
             </div>
         </div>
         <div class="hero-bg-shapes">
@@ -248,12 +253,17 @@
     <!-- Contact Section -->
     <section id="contact" class="section">
         <div class="container">
-            <h2 class="section-title reveal">Contáctanos</h2>
+            <h2 class="section-title reveal">Crea tu pedido</h2>
+            <p class="section-subtitle reveal">Cuéntanos qué necesitas; registraremos tu solicitud y continuaremos la atención por WhatsApp.</p>
             <div class="contact-wrapper">
                 <form id="contact-form" class="glass-form reveal">
                     <div class="form-group">
                         <label for="name">Tu Nombre</label>
-                        <input type="text" id="name" required placeholder="Ej. Ana Pérez">
+                        <input type="text" id="name" required minlength="2" maxlength="100" autocomplete="name" placeholder="Ej. Ana Pérez">
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Teléfono (WhatsApp)</label>
+                        <input type="tel" id="phone" required inputmode="tel" autocomplete="tel" minlength="7" maxlength="20" placeholder="Ej. 5612345678">
                     </div>
                     <div class="form-group">
                         <label for="service">¿Qué te interesa?</label>
@@ -261,16 +271,33 @@
                             <option value="">Selecciona una opción...</option>
                             <option value="Catálogo/Garage">Catálogo / Venta de Garage</option>
                             <option value="Productos Personalizados">Productos Personalizados</option>
-                            <option value="Impresiones/Copias">Impresiones / Copias</option>
+                            <option value="Impresiones/Copias/Escáner">Copias / Impresiones / Escáner</option>
                             <option value="Paginas Web">Creación de Páginas Web</option>
                             <option value="Otro">Otro / Duda general</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="message">Mensaje</label>
-                        <textarea id="message" rows="4" required placeholder="Cuéntanos los detalles..."></textarea>
+                        <textarea id="message" rows="4" required minlength="3" maxlength="1500" placeholder="Cuéntanos los detalles..."></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Enviar a WhatsApp 💬</button>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="preferred-date">¿Para cuándo lo necesitas?</label>
+                            <input type="date" id="preferred-date">
+                        </div>
+                        <div class="form-group">
+                            <label for="delivery-type">Forma de entrega</label>
+                            <select id="delivery-type">
+                                <option value="Por acordar">Por acordar</option>
+                                <option value="Recoger">Pasar a recoger</option>
+                                <option value="Punto medio">Punto medio</option>
+                                <option value="Envío">Envío</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Registrar y enviar por WhatsApp 💬</button>
+                    <p class="privacy-note">Al enviar aceptas que usemos tus datos únicamente para preparar y dar seguimiento a tu pedido.</p>
+                    <div id="contact-order-confirmation" class="order-confirmation" hidden></div>
                 </form>
             </div>
         </div>
@@ -310,7 +337,7 @@
         </svg>
     </a>
     <!-- Floating Cart Button -->
-    <button id="floating-cart-btn" class="floating-cart-btn hidden">
+    <button id="floating-cart-btn" class="floating-cart-btn hidden" aria-label="Abrir pedido">
         <i class="fa-solid fa-cart-shopping"></i>
         <span id="cart-count">0</span>
     </button>
@@ -318,7 +345,7 @@
     <!-- Cart Modal -->
     <div id="cart-modal" class="screen">
         <div class="cart-box">
-            <button id="close-cart-btn" class="close-modal"><i class="fa-solid fa-xmark"></i></button>
+            <button id="close-cart-btn" class="close-modal" aria-label="Cerrar pedido"><i class="fa-solid fa-xmark"></i></button>
             <h2>🛒 Tu Pedido</h2>
             <div id="cart-items" class="cart-items">
                 <!-- Artículos del carrito irán aquí -->
@@ -328,18 +355,43 @@
                 <span id="cart-total-price">$0 MXN</span>
             </div>
             <div class="form-group" style="margin-top: 15px;">
+                <label for="cart-customer-name">Tu nombre</label>
+                <input type="text" id="cart-customer-name" autocomplete="name" minlength="2" maxlength="100" placeholder="Ej. Ana Pérez" required>
+            </div>
+            <div class="form-group">
+                <label for="cart-customer-phone">Teléfono (WhatsApp)</label>
+                <input type="tel" id="cart-customer-phone" inputmode="tel" autocomplete="tel" minlength="7" maxlength="20" placeholder="Ej. 5612345678" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="cart-preferred-date">Fecha deseada</label>
+                    <input type="date" id="cart-preferred-date">
+                </div>
+                <div class="form-group">
+                    <label for="cart-delivery-type">Entrega</label>
+                    <select id="cart-delivery-type">
+                        <option value="Por acordar">Por acordar</option>
+                        <option value="Recoger">Recoger</option>
+                        <option value="Punto medio">Punto medio</option>
+                        <option value="Envío">Envío</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top: 15px;">
                 <label>Comentarios adicionales (opcional)</label>
-                <textarea id="cart-comments" rows="2" placeholder="Ej. Paso a recogerlo a las 5 PM, lo quiero para regalo..."></textarea>
+                <textarea id="cart-comments" rows="2" maxlength="1500" placeholder="Ej. Paso a recogerlo a las 5 PM, lo quiero para regalo..."></textarea>
             </div>
             <button id="send-whatsapp-btn" class="btn btn-primary w-100 mt-2" style="background:#25D366; color:white;">
-                <i class="fa-brands fa-whatsapp"></i> Enviar Pedido
+                <i class="fa-brands fa-whatsapp"></i> Registrar y enviar pedido
             </button>
+            <p class="privacy-note">Tus datos se usarán únicamente para atender este pedido.</p>
+            <div id="cart-order-confirmation" class="order-confirmation" hidden></div>
         </div>
     </div>
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script type="module" src="script.js"></script>
+    <script type="module" src="script.js?v=3"></script>
 </body>
 
 </html>

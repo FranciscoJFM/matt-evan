@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mattevan Admin - MODO BESTIA</title>
-    <link rel="stylesheet" href="admin.css?v=2">
+    <link rel="stylesheet" href="admin.css?v=3">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
@@ -106,9 +106,21 @@
                     <div class="stat-card" style="border-left-color: #bb86fc; box-shadow: 0 0 15px rgba(187,134,252,0.1);">
                         <div class="stat-icon" style="color: #bb86fc;"><i class="fa-solid fa-sack-dollar"></i></div>
                         <div>
-                            <h4>Ingresos Brutos</h4>
+                            <h4>Ingresos Registrados</h4>
                             <p id="stat-ingresos">$0</p>
                         </div>
+                    </div>
+                    <div class="stat-card cyan">
+                        <div class="stat-icon"><i class="fa-solid fa-clipboard-list"></i></div>
+                        <div><h4>Pedidos Activos</h4><p id="stat-pedidos-activos">0</p></div>
+                    </div>
+                    <div class="stat-card yellow">
+                        <div class="stat-icon"><i class="fa-solid fa-box-open"></i></div>
+                        <div><h4>Listos para Entrega</h4><p id="stat-pedidos-listos">0</p></div>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-icon"><i class="fa-solid fa-wallet"></i></div>
+                        <div><h4>Saldos Pendientes</h4><p id="stat-saldos">$0</p></div>
                     </div>
                 </div>
                 <div class="dashboard-grid">
@@ -154,25 +166,48 @@
                     <h2>📋 Kanban de Pedidos / Encargos</h2>
                     <button id="add-encargo-btn" class="beast-btn pulse"><i class="fa-solid fa-plus"></i> Nuevo Pedido</button>
                 </div>
+                <div class="kanban-toolbar">
+                    <input type="search" id="encargos-search" placeholder="Buscar por folio, cliente, teléfono o producto..." aria-label="Buscar encargos">
+                    <select id="encargos-status-filter" aria-label="Filtrar encargos por estado">
+                        <option value="all">Todos los estados</option>
+                        <option value="Nuevo">Nuevos</option>
+                        <option value="Cotizado">Cotizados</option>
+                        <option value="Produccion">En producción</option>
+                        <option value="Listo">Listos</option>
+                        <option value="Entregado">Entregados</option>
+                        <option value="Cancelado">Cancelados</option>
+                    </select>
+                </div>
                 
                 <div class="kanban-board">
-                    <!-- Columna 1: Pendiente -->
-                    <div class="kanban-column" id="kb-col-pendiente" data-status="Pendiente">
+                    <div class="kanban-column" id="kb-col-nuevo" data-status="Nuevo">
                         <div class="kanban-col-header">
-                            <h3>⏳ Pendientes</h3>
+                            <h3>🆕 Nuevos</h3>
                         </div>
                         <div class="kanban-col-content"></div>
                     </div>
                     
-                    <!-- Columna 2: Conseguido -->
-                    <div class="kanban-column" id="kb-col-conseguido" data-status="Conseguido">
+                    <div class="kanban-column" id="kb-col-cotizado" data-status="Cotizado">
                         <div class="kanban-col-header">
-                            <h3>📦 Conseguidos</h3>
+                            <h3>💬 Cotizados</h3>
+                        </div>
+                        <div class="kanban-col-content"></div>
+                    </div>
+
+                    <div class="kanban-column" id="kb-col-produccion" data-status="Produccion">
+                        <div class="kanban-col-header">
+                            <h3>🎨 En producción</h3>
+                        </div>
+                        <div class="kanban-col-content"></div>
+                    </div>
+
+                    <div class="kanban-column" id="kb-col-listo" data-status="Listo">
+                        <div class="kanban-col-header">
+                            <h3>📦 Listos</h3>
                         </div>
                         <div class="kanban-col-content"></div>
                     </div>
                     
-                    <!-- Columna 3: Entregado -->
                     <div class="kanban-column" id="kb-col-entregado" data-status="Entregado">
                         <div class="kanban-col-header">
                             <h3>✅ Entregados</h3>
@@ -180,7 +215,6 @@
                         <div class="kanban-col-content"></div>
                     </div>
 
-                    <!-- Columna 4: Cancelado -->
                     <div class="kanban-column" id="kb-col-cancelado" data-status="Cancelado">
                         <div class="kanban-col-header" style="border-bottom-color: var(--danger-color);">
                             <h3>🚫 Cancelados</h3>
@@ -267,6 +301,6 @@
     <!-- TOAST -->
     <div id="admin-toast" class="admin-toast"></div>
 
-    <script type="module" src="admin.js"></script>
+    <script type="module" src="admin.js?v=3"></script>
 </body>
 </html>

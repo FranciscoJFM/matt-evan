@@ -315,6 +315,7 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
     .products-grid { grid-template-columns: 1fr; }
     .section-header h2 { font-size: 1.3rem; }
     .content-section { padding: 20px; }
+    .kanban-toolbar { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
     .stats-cards { grid-template-columns: 1fr; }
@@ -347,10 +348,32 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
     padding: 15px;
     border-bottom: 2px solid var(--primary);
 }
-#kb-col-pendiente .kanban-col-header { border-bottom-color: var(--tertiary); }
-#kb-col-conseguido .kanban-col-header { border-bottom-color: var(--primary); }
+#kb-col-nuevo .kanban-col-header { border-bottom-color: var(--tertiary); }
+#kb-col-cotizado .kanban-col-header { border-bottom-color: #bb86fc; }
+#kb-col-produccion .kanban-col-header { border-bottom-color: var(--primary); }
+#kb-col-listo .kanban-col-header { border-bottom-color: #ff9800; }
 #kb-col-entregado .kanban-col-header { border-bottom-color: var(--green); }
 #kb-col-cancelado .kanban-col-header { border-bottom-color: var(--red); }
+
+.kanban-toolbar {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) minmax(180px, 260px);
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.kanban-toolbar input,
+.kanban-toolbar select {
+    width: 100%; padding: 11px 14px; color: var(--text-light);
+    background: var(--bg-input); border: 1px solid var(--border);
+    border-radius: 10px; font: inherit;
+}
+
+.kb-card-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.kb-chip { padding: 3px 7px; border-radius: 10px; background: var(--bg-input); color: var(--text-muted); font-size: .72rem; }
+.kb-chip.due-late { color: var(--red); border: 1px solid rgba(255,68,68,.4); }
+.kb-card-folio { color: var(--tertiary); font-weight: 800; font-size: .78rem; }
+.kb-card-actions .btn-whatsapp:hover { color: var(--green); }
 
 .kanban-col-header h3 {
     margin: 0;

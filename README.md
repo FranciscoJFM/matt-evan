@@ -1,25 +1,37 @@
-# mattEvan — Sitio Web
+# mattEvan — Catálogo y gestión de pedidos
 
-Landing page estática lista para Vercel. Evolucionada de una simple "venta de garage" a un catálogo completo de productos y servicios (Papelería, Diseño, Personalizados).
+Sitio público y panel administrativo para gestionar productos, categorías, pedidos personalizados, inventario, promociones y galería.
 
 ## Archivos
 
 - `index.html` — estructura principal
 - `styles.css` — diseño responsive, glassmorphism, paleta neón
-- `script.js` — lógica de filtros, menú móvil, WhatsApp, formulario y animaciones
+- `script.js` — catálogo, carrito, pedidos, WhatsApp y contenido dinámico
+- `admin.html`, `admin.css`, `admin.js` — panel administrativo
+- `firestore.rules` — reglas de lectura pública y creación segura de pedidos
+- `firebase.json` — configuración para desplegar reglas de Firestore y Storage
+- `storage.rules` — lectura pública y carga protegida de imágenes/PDF
 - `vercel.json` — configuración básica para Vercel
 - `assets/` — imágenes generadas
 
-## Antes de publicar
+## Funciones principales
 
-Abre `script.js` y cambia las variables de configuración en la parte superior:
+- Categorías dinámicas relacionadas con productos.
+- Carrito con cantidades, stock y totales.
+- Pedidos con folio, estados, fecha de entrega, anticipo y saldo.
+- Kanban: nuevos, cotizados, producción, listos, entregados y cancelados.
+- Formulario público conectado a la colección `encargos`.
+- Configuración de WhatsApp y redes desde el administrador.
 
-```javascript
-const CONFIG = {
-    WHATSAPP_NUMBER: "5215512345678", // Cambia esto por tu número sin + ni espacios
-    INSTAGRAM_URL: "https://instagram.com/tu_cuenta",
-};
+## Publicación
+
+El sitio se despliega en Vercel al actualizar la rama principal. Las reglas de Firestore se despliegan por separado:
+
+```bash
+firebase deploy --only firestore:rules,storage
 ```
+
+Antes de hacerlo, inicia sesión con Firebase CLI y selecciona el proyecto `mattevan-6c73f`.
 
 ## Publicar en Vercel
 
@@ -35,5 +47,6 @@ npm i -g vercel
 vercel
 ```
 
-## Notas
-La página no requiere servidor ni base de datos. El formulario abre WhatsApp con el mensaje prellenado, y los botones de los productos hacen lo mismo. Todo el SEO básico está incluido en el `index.html`.
+## Seguridad
+
+La página pública puede leer el catálogo y crear pedidos, pero no leer, modificar ni eliminar encargos. El panel requiere Firebase Authentication. Se recomienda activar Firebase App Check para reducir spam automatizado.

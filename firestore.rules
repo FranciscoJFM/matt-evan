@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    function validPublicOrder() {
+      return request.resource.data.keys().hasOnly([
+          'cliente', 'telefono', 'producto', 'estado', 'origen', 'folio',
+          'categoria', 'total', 'anticipo', 'fechaEntrega', 'tipoEntrega',
+          'notas', 'creadoEn'
+        ])
+        && request.resource.data.cliente is string
+        && request.resource.data.cliente.size() >= 2
+        && request.resource.data.cliente.size() <= 100
+        && request.resource.data.telefono is string
+        && request.resource.data.telefono.size() >= 7
+        && request.resource.data.telefono.size() <= 20
+        && request.resource.data.producto is string
+        && request.resource.data.producto.size() >= 3
+        && request.resource.data.producto.size() <= 3000
+        && request.resource.data.categoria is string
+        && request.resource.data.categoria.size() <= 100
+        && request.resource.data.fechaEntrega is string
+        && request.resource.data.fechaEntrega.size() <= 10
+        && request.resource.data.tipoEntrega in ['Por acordar', 'Recoger', 'Punto medio', 'Envío']
+        && request.resource.data.notas is string
+        && request.resource.data.notas.size() <= 1500
+        && request.resource.data.estado == 'Nuevo'
+        && request.resource.data.origen in ['Carrito web', 'Formulario web']
+        && request.resource.data.folio is string
+        && request.resource.data.folio.size() <= 30
+        && request.resource.data.total is number
+        && request.resource.data.total >= 0
+        && request.resource.data.anticipo == 0
+        && request.resource.data.creadoEn == request.time;
+    }
+
+    match /encargos/{orderId} {
+      allow create: if isAdmin() || validPublicOrder();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /{collectionName}/{documentId} {
+      allow read: if collectionName in [
+        'productos', 'categorias', 'novedades', 'promociones', 'galeria', 'configuracion'
+      ];
+      allow write: if isAdmin();
+    }
+  }
+}
