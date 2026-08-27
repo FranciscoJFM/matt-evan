@@ -356,6 +356,11 @@
                 <span>Total:</span>
                 <span id="cart-total-price">$0 MXN</span>
             </div>
+            <div class="coupon-entry">
+                <input type="text" id="cart-coupon" maxlength="30" placeholder="Código de descuento">
+                <button type="button" id="apply-coupon-btn">Aplicar</button>
+            </div>
+            <p id="coupon-message" class="coupon-message"></p>
             <div class="form-group" style="margin-top: 15px;">
                 <label for="cart-customer-name">Tu nombre</label>
                 <input type="text" id="cart-customer-name" autocomplete="name" minlength="2" maxlength="100" placeholder="Ej. Ana Pérez" required>
@@ -393,7 +398,7 @@
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script type="module" src="script.js?v=10"></script>
+    <script type="module" src="script.js?v=11"></script>
 </body>
 
 </html>

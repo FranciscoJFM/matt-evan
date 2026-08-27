@@ -1486,6 +1486,11 @@ footer p {
 .my-order-actions button { padding: 7px 11px; border: 1px solid var(--glass-border); border-radius: 8px; background: rgba(0,0,0,.25); color: var(--text-main); cursor: pointer; }
 .my-order-actions .cancel-order-btn { border-color: #ff5468; color: #ff8b99; }
 .cancellation-requested { color: #ffd166; font-weight: 700; }
+.cancellation-policy { color: var(--text-muted); font-size: .78rem; }
+.coupon-entry { display: flex; gap: 8px; margin: 12px 0 2px; }
+.coupon-entry input { flex: 1; min-width: 0; padding: 10px 12px; text-transform: uppercase; color: var(--text-main); background: rgba(0,0,0,.3); border: 1px solid var(--glass-border); border-radius: 8px; }
+.coupon-entry button { padding: 10px 14px; border: 0; border-radius: 8px; background: var(--primary-cyan); color: #071018; font-weight: 800; cursor: pointer; }
+.coupon-message { min-height: 20px; margin: 3px 0 8px; color: var(--primary-cyan); font-size: .85rem; }
 .privacy-note { margin-top: 10px; color: var(--text-muted); font-size: .78rem; text-align: center; }
 .order-confirmation { margin-top: 12px; padding: 12px; border: 1px solid rgba(0,230,118,.45); border-radius: 10px; background: rgba(0,230,118,.1); color: #8dffbd !important; text-align: center; font-weight: 700; }
 

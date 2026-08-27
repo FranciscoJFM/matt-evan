@@ -488,3 +488,4 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
 .kb-card-actions .btn-delete:hover { color: var(--red); }
 .kb-card-actions .btn-cancellation { color: var(--red); }
 .kb-chip.cancellation-alert { flex-basis: 100%; border-color: var(--red); color: #ff8794; white-space: normal; }
+.coupons-header { margin-top: 28px; }

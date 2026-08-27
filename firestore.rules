@@ -10,7 +10,7 @@ service cloud.firestore {
     function validPublicOrder() {
       return request.resource.data.keys().hasOnly([
           'cliente', 'telefono', 'producto', 'estado', 'origen', 'folio',
-          'categoria', 'total', 'anticipo', 'fechaEntrega', 'tipoEntrega',
+          'categoria', 'total', 'subtotal', 'descuento', 'cupon', 'anticipo', 'fechaEntrega', 'tipoEntrega',
           'notas', 'items', 'archivo', 'cancelacionToken', 'creadoEn'
         ])
         && request.resource.data.cliente is string
@@ -41,6 +41,31 @@ service cloud.firestore {
         && request.resource.data.folio.size() <= 30
         && request.resource.data.total is number
         && request.resource.data.total >= 0
+        && request.resource.data.subtotal is number
+        && request.resource.data.subtotal >= request.resource.data.total
+        && request.resource.data.descuento is number
+        && request.resource.data.descuento >= 0
+        && request.resource.data.total == request.resource.data.subtotal - request.resource.data.descuento
+        && request.resource.data.cupon is string
+        && request.resource.data.cupon.size() <= 30
+        && (
+          (request.resource.data.cupon == '' && request.resource.data.descuento == 0)
+          || (
+            request.resource.data.cupon != ''
+            && get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.activa == true
+            && request.resource.data.subtotal >= get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.minCompra
+            && (
+              (get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.tipo == 'Porcentaje'
+                && request.resource.data.descuento <= request.resource.data.subtotal * get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.valor / 100 + 0.01)
+              || (get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.tipo == 'Monto fijo'
+                && request.resource.data.descuento <= get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.valor)
+            )
+            && (
+              get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.limiteUsos == 0
+              || get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.usos < get(/databases/$(database)/documents/cupones/$(request.resource.data.cupon)).data.limiteUsos
+            )
+          )
+        )
         && request.resource.data.anticipo == 0
         && request.resource.data.creadoEn == request.time;
     }
@@ -58,15 +83,30 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
       allow create: if isAdmin() || (
-        request.resource.data.keys().hasOnly(['folio','estado','fechaEntrega','total','pagado','saldo','actualizadoEn'])
+        request.resource.data.keys().hasOnly(['folio','estado','fechaEntrega','total','pagado','saldo','permitirOcultar','actualizadoEn'])
         && request.resource.data.folio == folio
         && folio.size() >= 20
         && request.resource.data.estado == 'Nuevo'
         && request.resource.data.pagado == 0
         && request.resource.data.saldo == request.resource.data.total
+        && request.resource.data.permitirOcultar == false
         && request.resource.data.actualizadoEn == request.time
       );
       allow update, delete: if isAdmin();
+    }
+
+    match /cupones/{code} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['usos','ultimoPedidoId'])
+        && request.resource.data.usos == resource.data.usos + 1
+        && request.resource.data.ultimoPedidoId is string
+        && getAfter(/databases/$(database)/documents/encargos/$(request.resource.data.ultimoPedidoId)).data.cupon == code
+        && getAfter(/databases/$(database)/documents/encargos/$(request.resource.data.ultimoPedidoId)).data.creadoEn == request.time
+        && (resource.data.limiteUsos == 0 || request.resource.data.usos <= resource.data.limiteUsos)
+      );
     }
 
     match /cancelaciones/{token} {
@@ -92,6 +132,8 @@ service cloud.firestore {
         && request.resource.data.motivo.size() >= 3
         && request.resource.data.motivo.size() <= 300
         && request.resource.data.solicitadaEn == request.time
+        && get(/databases/$(database)/documents/encargos/$(resource.data.orderId)).data.total > 300
+        && !(get(/databases/$(database)/documents/encargos/$(resource.data.orderId)).data.estado in ['Entregado', 'Cancelado'])
       );
       allow delete: if isAdmin();
     }

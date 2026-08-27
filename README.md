@@ -26,6 +26,9 @@ Sitio público y panel administrativo para gestionar productos, categorías, ped
 - Agenda de entregas y cobros, historial por cliente y exportación CSV de pedidos y pagos.
 - Formulario público con archivo Base64 opcional y seguimiento por folio sin exponer los datos del cliente.
 - “Mis pedidos” en el dispositivo, con actualización de estado, opción de compartir y solicitud privada de cancelación.
+- Cancelación pública disponible únicamente para pedidos mayores de $300 MXN; el administrador conserva la excepción manual.
+- El cliente sólo puede quitar un pedido de “Mis pedidos” cuando el administrador lo autoriza.
+- Cupones dinámicos por porcentaje o monto fijo, con compra mínima, vigencia, categorías y límite de usos.
 - Cancelaciones auditables con ventana gratuita de 10 minutos, cargo sugerido de 30% en producción y 50% al estar listo, además de cálculo de reembolso o saldo.
 - Configuración de WhatsApp y redes desde el administrador.
 - Imágenes comprimidas y guardadas como Base64 en Firestore, sin depender de Firebase Storage.

@@ -1,6 +1,6 @@
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, writeBatch, increment, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -54,8 +54,9 @@ async function renderMyOrders() {
         <small>${order.tracking?.fechaEntrega ? `Entrega estimada: ${escapeHtml(order.tracking.fechaEntrega)} · ` : ''}Saldo: $${Number(order.tracking?.saldo || 0).toLocaleString('es-MX')}</small>
         <div class="my-order-actions">
             <button type="button" onclick="sharePage()">Recomendar página</button>
-            ${!['Entregado', 'Cancelado'].includes(order.tracking?.estado) && order.cancellation?.estado !== 'Solicitada' ? `<button type="button" class="cancel-order-btn" onclick="requestOrderCancellation('${escapeHtml(order.cancelacionToken || '')}', '${escapeHtml(order.folio)}')">Cancelar pedido</button>` : ''}
-            <button type="button" onclick="removeMyOrder('${escapeHtml(order.folio)}')">Quitar de la lista</button>
+            ${Number(order.tracking?.total || 0) > 300 && !['Entregado', 'Cancelado'].includes(order.tracking?.estado) && order.cancellation?.estado !== 'Solicitada' ? `<button type="button" class="cancel-order-btn" onclick="requestOrderCancellation('${escapeHtml(order.cancelacionToken || '')}', '${escapeHtml(order.folio)}')">Cancelar pedido</button>` : ''}
+            ${Number(order.tracking?.total || 0) <= 300 && !['Entregado', 'Cancelado'].includes(order.tracking?.estado) ? '<span class="cancellation-policy">Pedidos de hasta $300 no admiten cancelación en línea</span>' : ''}
+            ${order.tracking?.permitirOcultar ? `<button type="button" onclick="removeMyOrder('${escapeHtml(order.folio)}')">Quitar de la lista</button>` : '<span class="cancellation-policy">El administrador debe autorizar quitarlo</span>'}
             ${order.cancellation?.estado === 'Solicitada' ? '<span class="cancellation-requested">Cancelación solicitada</span>' : ''}
         </div>
     </article>`).join('');
@@ -106,6 +107,9 @@ async function createEncargo(cliente, telefono, producto, origen, details = {}) 
         folio,
         categoria: details.categoria || '',
         total: Number(details.total) || 0,
+        subtotal: Number(details.subtotal ?? details.total) || 0,
+        descuento: Number(details.descuento) || 0,
+        cupon: details.cupon || '',
         anticipo: 0,
         fechaEntrega: details.fechaEntrega || '',
         tipoEntrega: details.tipoEntrega || 'Por acordar',
@@ -120,11 +124,13 @@ async function createEncargo(cliente, telefono, producto, origen, details = {}) 
     batch.set(doc(db, 'seguimiento', folio), {
         folio, estado: 'Nuevo', fechaEntrega: details.fechaEntrega || '',
         total: Number(details.total) || 0, pagado: 0, saldo: Number(details.total) || 0,
+        permitirOcultar: false,
         actualizadoEn: serverTimestamp()
     });
     batch.set(doc(db, 'cancelaciones', cancelacionToken), {
         orderId: reference.id, folio, estado: 'Disponible', motivo: '', creadoEn: serverTimestamp()
     });
+    if (details.cupon) batch.update(doc(db, 'cupones', details.cupon), { usos: increment(1), ultimoPedidoId: reference.id });
     await batch.commit();
     return { reference, folio, cancelacionToken };
 }
@@ -498,6 +504,14 @@ let cart = JSON.parse(localStorage.getItem('mattevan_cart') || '[]').map(item =>
     cantidad: Number(item.cantidad) || 1,
     precio: Number(item.precio) || 0
 }));
+let appliedCoupon = null;
+
+function cartSubtotal() { return cart.reduce((sum, item) => sum + item.precio * item.cantidad, 0); }
+function couponDiscount(subtotal = cartSubtotal()) {
+    if (!appliedCoupon) return 0;
+    const raw = appliedCoupon.tipo === 'Porcentaje' ? subtotal * Number(appliedCoupon.valor || 0) / 100 : Number(appliedCoupon.valor || 0);
+    return Math.min(subtotal, Math.max(0, Math.round((raw + Number.EPSILON) * 100) / 100));
+}
 
 function saveCart() {
     localStorage.setItem('mattevan_cart', JSON.stringify(cart));
@@ -569,6 +583,7 @@ function renderCartModal() {
     if (!container) return;
 
     if (cart.length === 0) {
+        appliedCoupon = null;
         container.innerHTML = `<p style="text-align:center; color:#888; padding:20px;">Tu carrito está vacío. 🛒</p>`;
         if (totalEl) totalEl.innerText = "$0 MXN";
         return;
@@ -596,7 +611,8 @@ function renderCartModal() {
     });
 
     container.innerHTML = html;
-    if (totalEl) totalEl.innerText = `$${total.toLocaleString('es-MX')} MXN`;
+    const discount = couponDiscount(total);
+    if (totalEl) totalEl.innerText = discount ? `$${(total - discount).toLocaleString('es-MX')} MXN (ahorras $${discount.toLocaleString('es-MX')})` : `$${total.toLocaleString('es-MX')} MXN`;
 }
 
 window.changeCartQuantity = function(index, change) {
@@ -634,6 +650,7 @@ function setupCartModal() {
     const floatingBtn = document.getElementById("floating-cart-btn");
     const closeBtn = document.getElementById("close-cart-btn");
     const sendBtn = document.getElementById("send-whatsapp-btn");
+    const couponBtn = document.getElementById('apply-coupon-btn');
 
     // Evitar duplicar listeners
     floatingBtn?.addEventListener("click", () => {
@@ -643,6 +660,27 @@ function setupCartModal() {
 
     closeBtn?.addEventListener("click", () => {
         modal.classList.remove("active");
+    });
+
+    couponBtn?.addEventListener('click', async () => {
+        const code = document.getElementById('cart-coupon').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+        const message = document.getElementById('coupon-message');
+        if (!code) { message.textContent = 'Escribe un código.'; return; }
+        try {
+            const snapshot = await getDoc(doc(db, 'cupones', code));
+            if (!snapshot.exists()) throw new Error('Cupón no válido.');
+            const coupon = { codigo: code, ...snapshot.data() };
+            const subtotal = cartSubtotal();
+            const categories = [...new Set(cart.map(item => item.categoria).filter(Boolean))];
+            if (!coupon.activa) throw new Error('Este cupón no está activo.');
+            if (coupon.vence && coupon.vence < new Date().toISOString().slice(0, 10)) throw new Error('Este cupón venció.');
+            if (subtotal < Number(coupon.minCompra || 0)) throw new Error(`Compra mínima: $${Number(coupon.minCompra).toLocaleString('es-MX')}.`);
+            if (Number(coupon.limiteUsos || 0) > 0 && Number(coupon.usos || 0) >= Number(coupon.limiteUsos)) throw new Error('Este cupón alcanzó su límite de usos.');
+            if (coupon.categorias?.length && !categories.every(category => coupon.categorias.includes(category))) throw new Error('El cupón no aplica a todos los productos elegidos.');
+            appliedCoupon = coupon;
+            message.textContent = `Cupón ${code} aplicado: ahorras $${couponDiscount(subtotal).toLocaleString('es-MX')}.`;
+            renderCartModal();
+        } catch (error) { appliedCoupon = null; message.textContent = error.message || 'No se pudo aplicar el cupón.'; renderCartModal(); }
     });
 
     // Cerrar al hacer clic en el fondo oscuro
@@ -666,13 +704,15 @@ function setupCartModal() {
         }
 
         let text = "¡Hola mattEvan! Quiero pedir lo siguiente:\n\n";
-        let total = 0;
+        let subtotal = 0;
         cart.forEach(item => {
-            const subtotal = item.precio * item.cantidad;
-            text += `👉 ${item.cantidad} × ${item.nombre} - $${subtotal.toLocaleString('es-MX')}\n`;
-            total += subtotal;
+            const itemSubtotal = item.precio * item.cantidad;
+            text += `👉 ${item.cantidad} × ${item.nombre} - $${itemSubtotal.toLocaleString('es-MX')}\n`;
+            subtotal += itemSubtotal;
         });
-        text += `\n*Total a pagar: $${total} MXN*`;
+        const descuento = couponDiscount(subtotal);
+        const total = Math.max(0, subtotal - descuento);
+        text += `\n*Subtotal: $${subtotal} MXN*${descuento ? `\n*Cupón ${appliedCoupon.codigo}: -$${descuento} MXN*` : ''}\n*Total a pagar: $${total} MXN*`;
 
         const comments = document.getElementById("cart-comments").value.trim();
         if (comments) {
@@ -688,6 +728,9 @@ function setupCartModal() {
         try {
             const { folio, cancelacionToken } = await createEncargo(cliente, telefono, producto, "Carrito web", {
                 total,
+                subtotal,
+                descuento,
+                cupon: appliedCoupon?.codigo || '',
                 categoria: cart.length === 1 ? cart[0].categoria : 'varios',
                 notas: comments,
                 fechaEntrega,
@@ -696,6 +739,7 @@ function setupCartModal() {
             });
             rememberOrder(folio, cliente, telefono, producto, cancelacionToken);
             cart = [];
+            appliedCoupon = null;
             saveCart();
             updateCartUI();
             await renderMyOrders();

@@ -148,6 +148,7 @@ async function loadAll() {
         loadEncargos(),
         loadNovedades(),
         loadPromos(),
+        loadCoupons(),
         loadGallery(),
         loadConfig()
     ]);
@@ -659,6 +660,7 @@ async function syncTrackingOrders(orders) {
         total: normalizeOrderStatus(order.estado) === 'Cancelado' && order.cargoCancelacion != null ? Number(order.cargoCancelacion) : Number(order.total || 0),
         pagado: Number(order.pagadoCalculado || 0),
         saldo: Number(order.saldoCalculado || 0),
+        permitirOcultar: Boolean(order.permitirOcultar),
         actualizadoEn: serverTimestamp()
     }, { merge: true }));
     await batch.commit();
@@ -789,6 +791,7 @@ function renderEncargos() {
             <div class="kb-card-actions">
                 ${e.telefono ? `<button class="btn-whatsapp" onclick="contactEncargo('${e.id}')" title="Contactar por WhatsApp" aria-label="Contactar por WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
                 <button class="btn-payment" onclick="manageEncargoPayments('${e.id}')" title="Anticipos y abonos" aria-label="Administrar anticipos y abonos"><i class="fa-solid fa-wallet"></i></button>
+                <button onclick="toggleOrderVisibility('${e.id}')" title="${e.permitirOcultar ? 'Revocar permiso para quitar de Mis pedidos' : 'Autorizar quitar de Mis pedidos'}" aria-label="Autorizar visibilidad"><i class="fa-solid fa-${e.permitirOcultar ? 'lock' : 'unlock'}"></i></button>
                 ${e.solicitudCancelacion ? `<button class="btn-cancellation" onclick="resolveCancellation('${e.id}')" title="Resolver cancelación" aria-label="Resolver cancelación"><i class="fa-solid fa-ban"></i></button>` : ''}
                 ${e.archivo ? `<button onclick="openOrderFile('${e.id}')" title="Ver archivo del cliente" aria-label="Ver archivo del cliente"><i class="fa-solid fa-paperclip"></i></button>` : ''}
                 <button onclick="printEncargo('${e.id}')" title="Imprimir cotización" aria-label="Imprimir cotización"><i class="fa-solid fa-file-invoice-dollar"></i></button>
@@ -849,6 +852,17 @@ window.resolveCancellation = async function(orderId) {
         toast('Pedido movido a Cancelados');
         await loadEncargos(); updateDashboard();
     } catch (error) { console.error(error); toast('No se pudo resolver la cancelación', true); }
+};
+
+window.toggleOrderVisibility = async function(orderId) {
+    const order = allEncargos.find(item => item.id === orderId);
+    if (!order) return;
+    const permitirOcultar = !order.permitirOcultar;
+    await updateDoc(doc(db, 'encargos', orderId), { permitirOcultar, actualizadoEn: serverTimestamp() });
+    order.permitirOcultar = permitirOcultar;
+    await syncTrackingOrders([order]);
+    renderEncargos();
+    toast(permitirOcultar ? 'Cliente autorizado para quitarlo de su lista' : 'Autorización revocada');
 };
 
 // Configurar zonas para soltar
@@ -1385,6 +1399,47 @@ window.deletePromo = async function(id) {
         toast('Error', true); 
     }
 };
+
+// ======================================================
+//  CUPONES
+// ======================================================
+let allCoupons = [];
+document.getElementById('add-coupon-btn')?.addEventListener('click', () => showCouponForm());
+
+async function loadCoupons() {
+    const list = document.getElementById('admin-coupons-list');
+    if (!list) return;
+    const snap = await getDocs(collection(db, 'cupones'));
+    allCoupons = [];
+    snap.forEach(item => allCoupons.push({ id: item.id, ...item.data() }));
+    list.innerHTML = allCoupons.length ? allCoupons.map(coupon => `<div class="list-item"><div class="list-item-info">
+        <h4>🎟️ ${escapeHtml(coupon.id)} ${coupon.activa ? '<span class="badge-active">Activo</span>' : '<span class="badge-inactive">Inactivo</span>'}</h4>
+        <p>${coupon.tipo === 'Porcentaje' ? `${Number(coupon.valor)}%` : `$${Number(coupon.valor).toLocaleString('es-MX')}`} de descuento · Compra mínima $${Number(coupon.minCompra || 0).toLocaleString('es-MX')} · Vence ${escapeHtml(coupon.vence || 'sin fecha')} · Usos ${Number(coupon.usos || 0)}/${Number(coupon.limiteUsos || 0) || '∞'}</p>
+    </div><div class="list-item-actions"><button class="btn-edit" onclick="editCoupon('${coupon.id}')"><i class="fa-solid fa-pen"></i></button><button class="btn-delete" onclick="deleteCoupon('${coupon.id}')"><i class="fa-solid fa-trash"></i></button></div></div>`).join('') : '<p class="empty-state">No hay cupones creados.</p>';
+}
+
+function showCouponForm(coupon = null) {
+    const options = allCategories.filter(category => category.activa !== false).map(category => `<option value="${escapeHtml(category.slug)}" ${(coupon?.categorias || []).includes(category.slug) ? 'selected' : ''}>${escapeHtml(category.nombre)}</option>`).join('');
+    openModal(coupon ? 'EDITAR CUPÓN' : 'NUEVO CUPÓN', `<form id="coupon-form">
+        <div class="form-row"><div class="form-group"><label>Código</label><input id="coupon-code" required maxlength="30" value="${escapeHtml(coupon?.id || '')}" ${coupon ? 'readonly' : ''}></div><div class="form-group"><label>Tipo</label><select id="coupon-type"><option ${coupon?.tipo === 'Porcentaje' ? 'selected' : ''}>Porcentaje</option><option ${coupon?.tipo === 'Monto fijo' ? 'selected' : ''}>Monto fijo</option></select></div></div>
+        <div class="form-row"><div class="form-group"><label>Valor</label><input id="coupon-value" type="number" min="0.01" step="0.01" required value="${Number(coupon?.valor || 0)}"></div><div class="form-group"><label>Compra mínima</label><input id="coupon-min" type="number" min="0" step="0.01" value="${Number(coupon?.minCompra || 0)}"></div></div>
+        <div class="form-row"><div class="form-group"><label>Vigencia</label><input id="coupon-expiry" type="date" value="${escapeHtml(coupon?.vence || '')}"></div><div class="form-group"><label>Límite de usos (0 = ilimitado)</label><input id="coupon-limit" type="number" min="0" value="${Number(coupon?.limiteUsos || 0)}"></div></div>
+        <div class="form-group"><label>Categorías aplicables (vacío = todas)</label><select id="coupon-categories" multiple size="${Math.min(6, Math.max(3, allCategories.length))}">${options}</select></div>
+        <div class="form-group"><label><input id="coupon-active" type="checkbox" ${coupon?.activa !== false ? 'checked' : ''}> Cupón activo</label></div>
+        <button class="beast-btn" type="submit" style="width:100%">GUARDAR CUPÓN</button></form>`);
+    document.getElementById('coupon-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const code = document.getElementById('coupon-code').value.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+        if (code.length < 3) { toast('Código inválido', true); return; }
+        const data = { tipo: document.getElementById('coupon-type').value, valor: Number(document.getElementById('coupon-value').value), minCompra: Number(document.getElementById('coupon-min').value), vence: document.getElementById('coupon-expiry').value, limiteUsos: Number(document.getElementById('coupon-limit').value), usos: Number(coupon?.usos || 0), categorias: [...document.getElementById('coupon-categories').selectedOptions].map(option => option.value), activa: document.getElementById('coupon-active').checked, actualizadoEn: serverTimestamp() };
+        if (data.valor <= 0 || (data.tipo === 'Porcentaje' && data.valor > 100)) { toast('El valor del cupón no es válido', true); return; }
+        await setDoc(doc(db, 'cupones', code), data, { merge: true });
+        closeModal(); await loadCoupons(); toast('Cupón guardado ✅');
+    });
+}
+
+window.editCoupon = code => showCouponForm(allCoupons.find(coupon => coupon.id === code));
+window.deleteCoupon = async code => { if (!confirm(`¿Eliminar el cupón ${code}?`)) return; await deleteDoc(doc(db, 'cupones', code)); await loadCoupons(); toast('Cupón eliminado'); };
 
 // ======================================================
 //  GALERÍA
