@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="styles.css?v=7">
+    <link rel="stylesheet" href="styles.css?v=8">
     <link rel="icon" type="image/png" href="assets/Logo.png">
 </head>
 
@@ -91,6 +91,13 @@
                 <button type="submit" class="btn btn-primary">Consultar</button>
             </form>
             <div id="tracking-result" class="tracking-result" hidden></div>
+            <div class="my-orders reveal">
+                <div class="my-orders-header">
+                    <div><h3>Mis pedidos</h3><p>Pedidos registrados desde este dispositivo.</p></div>
+                    <button type="button" id="refresh-my-orders" class="btn btn-secondary">Actualizar estados</button>
+                </div>
+                <div id="my-orders-list"></div>
+            </div>
         </div>
     </section>
 
@@ -386,7 +393,7 @@
 
     <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-    <script type="module" src="script.js?v=7"></script>
+    <script type="module" src="script.js?v=8"></script>
 </body>
 
 </html>

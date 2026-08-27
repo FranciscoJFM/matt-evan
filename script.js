@@ -20,6 +20,38 @@ function createOrderFolio() {
     return `ME-${day}-${crypto.randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
 }
 
+const MY_ORDERS_KEY = 'mattevan_my_orders';
+
+function getMyOrders() {
+    try { return JSON.parse(localStorage.getItem(MY_ORDERS_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function rememberOrder(folio, cliente, telefono, producto) {
+    const orders = getMyOrders().filter(order => order.folio !== folio);
+    orders.unshift({ folio, cliente, telefono: String(telefono).replace(/\D/g, '').slice(-4), producto, registradoEn: new Date().toISOString() });
+    localStorage.setItem(MY_ORDERS_KEY, JSON.stringify(orders.slice(0, 25)));
+}
+
+async function renderMyOrders() {
+    const container = document.getElementById('my-orders-list');
+    if (!container) return;
+    const orders = getMyOrders();
+    if (!orders.length) { container.innerHTML = '<p class="empty-state">Todavía no has registrado pedidos en este dispositivo.</p>'; return; }
+    container.innerHTML = '<p class="empty-state">Actualizando tus pedidos...</p>';
+    const results = await Promise.all(orders.map(async order => {
+        try {
+            const snapshot = await getDoc(doc(db, 'seguimiento', order.folio));
+            return { ...order, tracking: snapshot.exists() ? snapshot.data() : null };
+        } catch { return { ...order, tracking: null }; }
+    }));
+    container.innerHTML = results.map(order => `<article class="my-order-card">
+        <div><h4>${escapeHtml(order.folio)}</h4><p>${escapeHtml(order.producto || 'Pedido mattEvan')}</p><small>${escapeHtml(order.cliente || '')}${order.telefono ? ` · Tel. terminado en ${escapeHtml(order.telefono)}` : ''}</small></div>
+        <span class="my-order-status">${escapeHtml(order.tracking?.estado || 'Sin conexión')}</span>
+        <small>${order.tracking?.fechaEntrega ? `Entrega estimada: ${escapeHtml(order.tracking.fechaEntrega)} · ` : ''}Saldo: $${Number(order.tracking?.saldo || 0).toLocaleString('es-MX')}</small>
+    </article>`).join('');
+}
+
 async function createEncargo(cliente, telefono, producto, origen, details = {}) {
     const folio = createOrderFolio();
     const reference = doc(collection(db, "encargos"));
@@ -616,6 +648,11 @@ function setupCartModal() {
                 tipoEntrega,
                 items: cart.map(item => ({ id: item.productId || item.id || '', nombre: item.nombre, variante: item.variante || '', precio: Number(item.precio), cantidad: Number(item.cantidad) }))
             });
+            rememberOrder(folio, cliente, telefono, producto);
+            cart = [];
+            saveCart();
+            updateCartUI();
+            await renderMyOrders();
             if (whatsappWindow) {
                 whatsappWindow.opener = null;
                 whatsappWindow.location.href = buildWhatsappUrl(text);
@@ -635,8 +672,6 @@ function setupCartModal() {
             return;
         }
 
-        cart = [];
-        saveCart();
         document.getElementById("cart-customer-name").value = "";
         document.getElementById("cart-customer-phone").value = "";
         document.getElementById("cart-preferred-date").value = "";
@@ -676,6 +711,8 @@ document.getElementById('tracking-form')?.addEventListener('submit', async event
     } catch (error) { console.error(error); result.innerHTML = '<p>No se pudo consultar el pedido. Intenta nuevamente.</p>'; }
 });
 
+document.getElementById('refresh-my-orders')?.addEventListener('click', renderMyOrders);
+
 // =========================================
 // INICIALIZAR TODO
 // =========================================
@@ -686,6 +723,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadConfig();
     setupCartModal();
     updateCartUI(); // Restaurar carrito desde localStorage
+    await renderMyOrders();
     await Promise.all([loadCatalog(), loadNovedades(), loadPromos(), loadGallery()]);
 });
 
@@ -733,6 +771,8 @@ if (form) {
                 tipoEntrega: deliveryType,
                 archivo: encodedFile
             });
+            rememberOrder(folio, name, phone, `${service}: ${message}`);
+            await renderMyOrders();
             if (whatsappWindow) {
                 whatsappWindow.opener = null;
                 whatsappWindow.location.href = buildWhatsappUrl(text);
