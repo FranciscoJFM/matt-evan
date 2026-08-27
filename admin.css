@@ -163,7 +163,7 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
 .mobile-menu-btn { display: none; background: none; border: none; color: var(--text-light); font-size: 1.3rem; cursor: pointer; }
 
 /* CONTENT SECTIONS */
-.content-section { display: none; padding: 30px; animation: fadeIn .3s; }
+.content-section { display: none; padding: 30px; animation: fadeIn .3s; max-width: 100%; overflow-x: hidden; }
 .content-section.active { display: block; }
 
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
