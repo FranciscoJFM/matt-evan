@@ -152,7 +152,12 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
 .logout-btn:hover { background: var(--red); color: white; }
 
 /* MAIN CONTENT */
-.main-content { flex: 1; margin-left: var(--sidebar-width); min-height: 100vh; }
+.main-content {
+    flex: 1;
+    min-width: 0;
+    margin-left: var(--sidebar-width);
+    min-height: 100vh;
+}
 
 .topbar {
     display: flex; align-items: center; justify-content: space-between; padding: 15px 30px;
@@ -331,9 +336,8 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
 .kanban-column {
     background-color: rgba(255, 255, 255, 0.02);
     border-radius: 12px;
-    min-width: 300px;
-    width: 300px;
-    flex-shrink: 0;
+    min-width: 220px;
+    flex: 1 0 220px;
     display: flex;
     flex-direction: column;
     border: 1px solid var(--border);
