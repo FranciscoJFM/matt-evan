@@ -9,8 +9,7 @@ Sitio público y panel administrativo para gestionar productos, categorías, ped
 - `script.js` — catálogo, carrito, pedidos, WhatsApp y contenido dinámico
 - `admin.html`, `admin.css`, `admin.js` — panel administrativo
 - `firestore.rules` — reglas de lectura pública y creación segura de pedidos
-- `firebase.json` — configuración para desplegar reglas de Firestore y Storage
-- `storage.rules` — lectura pública y carga protegida de imágenes/PDF
+- `firebase.json` — configuración para desplegar las reglas de Firestore
 - `vercel.json` — configuración básica para Vercel
 - `assets/` — imágenes generadas
 
@@ -22,13 +21,14 @@ Sitio público y panel administrativo para gestionar productos, categorías, ped
 - Kanban: nuevos, cotizados, producción, listos, entregados y cancelados.
 - Formulario público conectado a la colección `encargos`.
 - Configuración de WhatsApp y redes desde el administrador.
+- Imágenes comprimidas y guardadas como Base64 en Firestore, sin depender de Firebase Storage.
 
 ## Publicación
 
 El sitio se despliega en Vercel al actualizar la rama principal. Las reglas de Firestore se despliegan por separado:
 
 ```bash
-firebase deploy --only firestore:rules,storage
+firebase deploy --only firestore:rules
 ```
 
 Antes de hacerlo, inicia sesión con Firebase CLI y selecciona el proyecto `mattevan-6c73f`.

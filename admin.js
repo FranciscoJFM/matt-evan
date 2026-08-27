@@ -4,7 +4,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc, setDoc, getDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyBpEFLhubbnSpy5W3ziUpovZC-KN8RYtWQ",
@@ -18,7 +17,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
 function escapeHtml(value = '') {
     return String(value).replace(/[&<>'"]/g, character => ({
@@ -37,21 +35,6 @@ function createOrderFolio() {
     return `ME-${day}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 }
 
-async function uploadAsset(file, folder) {
-    if (!file) throw new Error('Selecciona un archivo.');
-    if (file.size > 8 * 1024 * 1024) throw new Error('El archivo no puede superar 8 MB.');
-    const extension = file.name.includes('.') ? file.name.split('.').pop().replace(/[^a-z0-9]/gi, '') : 'bin';
-    const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`;
-    const reference = storageRef(storage, path);
-    await uploadBytes(reference, file, { contentType: file.type });
-    return { url: await getDownloadURL(reference), path };
-}
-
-async function deleteStoredAsset(path) {
-    if (!path) return;
-    try { await deleteObject(storageRef(storage, path)); }
-    catch (error) { console.warn('No se pudo eliminar el archivo asociado:', error); }
-}
 
 // ============ DOM ELEMENTS ============
 const loginScreen = document.getElementById('login-screen');
@@ -272,17 +255,13 @@ function showProductForm(product = null) {
             const fileInput = document.getElementById('pf-img');
             if (fileInput.files.length > 0) {
                 const file = fileInput.files[0];
-                const uploaded = await uploadAsset(file, 'productos');
-                data.imagen = uploaded.url;
-                data.imagenPath = uploaded.path;
+                data.imagen = await fileToBase64(file);
             } else if (isEdit && product.imagen) {
                 data.imagen = product.imagen;
-                if (product.imagenPath) data.imagenPath = product.imagenPath;
             }
 
             if (isEdit) {
                 await updateDoc(doc(db, "productos", product.id), data);
-                if (fileInput.files.length > 0 && product.imagenPath && product.imagenPath !== data.imagenPath) await deleteStoredAsset(product.imagenPath);
                 toast('Producto actualizado ✅');
             } else {
                 data.fechaCreacion = new Date();
@@ -307,9 +286,7 @@ window.editProduct = function(id) {
 window.deleteProduct = async function(id) {
     if (!confirm('¿Eliminar este producto?')) return;
     try {
-        const product = allProducts.find(p => p.id === id);
         await deleteDoc(doc(db, "productos", id));
-        await deleteStoredAsset(product?.imagenPath);
         toast('Producto eliminado 🗑️');
         await loadProducts();
         updateDashboard();
@@ -328,7 +305,6 @@ window.clearSoldHistory = async function() {
     try {
         const deletes = vendidos.map(p => deleteDoc(doc(db, "productos", p.id)));
         await Promise.all(deletes);
-        await Promise.all(vendidos.map(p => deleteStoredAsset(p.imagenPath)));
         toast(`¡Historial limpio! ${vendidos.length} vendido${vendidos.length > 1 ? 's' : ''} eliminado${vendidos.length > 1 ? 's' : ''} 🗑️`);
         await loadProducts();
         updateDashboard();
@@ -845,17 +821,13 @@ function showNovedadForm(nov = null) {
         
         const fileInput = document.getElementById('nf-img');
         if (fileInput.files.length > 0) {
-            const uploaded = await uploadAsset(fileInput.files[0], 'novedades');
-            data.imagen = uploaded.url;
-            data.imagenPath = uploaded.path;
+            data.imagen = await fileToBase64(fileInput.files[0]);
         } else if (isEdit && nov.imagen) {
             data.imagen = nov.imagen;
-            if (nov.imagenPath) data.imagenPath = nov.imagenPath;
         }
 
             if (isEdit) {
                 await updateDoc(doc(db, "novedades", nov.id), data);
-                if (fileInput.files.length > 0 && nov.imagenPath !== data.imagenPath) await deleteStoredAsset(nov.imagenPath);
                 toast('Novedad actualizada ✅');
             }
             else { await addDoc(collection(db, "novedades"), data); toast('Novedad creada ✅'); }
@@ -868,8 +840,7 @@ window.editNovedad = function(id) { const n = allNovedades.find(x => x.id === id
 window.deleteNovedad = async function(id) {
     if (!confirm('¿Eliminar esta novedad?')) return;
     try {
-        const item = allNovedades.find(n => n.id === id);
-        await deleteDoc(doc(db, "novedades", id)); await deleteStoredAsset(item?.imagenPath);
+        await deleteDoc(doc(db, "novedades", id));
         toast('Novedad eliminada 🗑️'); await loadNovedades();
     } catch (err) {
         console.error(err);
@@ -933,17 +904,13 @@ function showPromoForm(promo = null) {
         
         const fileInput = document.getElementById('prf-img');
         if (fileInput.files.length > 0) {
-            const uploaded = await uploadAsset(fileInput.files[0], 'promociones');
-            data.imagen = uploaded.url;
-            data.imagenPath = uploaded.path;
+            data.imagen = await fileToBase64(fileInput.files[0]);
         } else if (isEdit && promo.imagen) {
             data.imagen = promo.imagen;
-            if (promo.imagenPath) data.imagenPath = promo.imagenPath;
         }
 
             if (isEdit) {
                 await updateDoc(doc(db, "promociones", promo.id), data);
-                if (fileInput.files.length > 0 && promo.imagenPath !== data.imagenPath) await deleteStoredAsset(promo.imagenPath);
                 toast('Promoción actualizada ✅');
             }
             else { await addDoc(collection(db, "promociones"), data); toast('Promoción creada ✅'); }
@@ -956,8 +923,7 @@ window.editPromo = function(id) { const p = allPromos.find(x => x.id === id); if
 window.deletePromo = async function(id) {
     if (!confirm('¿Eliminar esta promoción?')) return;
     try {
-        const item = allPromos.find(p => p.id === id);
-        await deleteDoc(doc(db, "promociones", id)); await deleteStoredAsset(item?.imagenPath);
+        await deleteDoc(doc(db, "promociones", id));
         toast('Promoción eliminada 🗑️'); await loadPromos();
     } catch (err) {
         console.error(err);
@@ -1008,8 +974,8 @@ function showGalleryForm() {
         btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Subiendo...';
         try {
             const file = document.getElementById('gf-img').files[0];
-            const uploaded = await uploadAsset(file, 'galeria');
-            await addDoc(collection(db, "galeria"), { imagen: uploaded.url, imagenPath: uploaded.path, alt: document.getElementById('gf-alt').value });
+            const base64Data = await fileToBase64(file);
+            await addDoc(collection(db, "galeria"), { imagen: base64Data, alt: document.getElementById('gf-alt').value });
             toast('Imagen subida ✅');
             closeModal(); await loadGallery(); updateDashboard();
         } catch (err) { toast('Error al subir imagen', true); }
@@ -1019,9 +985,7 @@ function showGalleryForm() {
 window.deleteGalleryItem = async function(id) {
     if (!confirm('¿Eliminar esta imagen?')) return;
     try {
-        const galleryItem = allGallery.find(item => item.id === id);
         await deleteDoc(doc(db, "galeria", id));
-        await deleteStoredAsset(galleryItem?.imagenPath);
         toast('Imagen eliminada 🗑️'); await loadGallery(); updateDashboard();
     } catch (err) {
         console.error(err);
@@ -1103,4 +1067,47 @@ function updateDashboard() {
         const count = allProducts.filter(p => p.categoria === c.slug).length;
         return `<div class="cat-row"><span class="cat-name">${escapeHtml(c.icono || '')} ${escapeHtml(c.nombre)}</span><span class="cat-count">${count}</span></div>`;
     }).join('');
+}
+
+// Convierte archivos a Base64 para guardarlos directamente en Firestore.
+// Las imágenes se reducen para mantener cada documento por debajo del límite de 1 MB.
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        if (!file) { reject(new Error('Selecciona un archivo.')); return; }
+
+        if (!file.type.startsWith('image/')) {
+            if (file.size > 700 * 1024) {
+                reject(new Error('El PDF no puede superar 700 KB al guardarse en Firestore.'));
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+            reader.readAsDataURL(file);
+            return;
+        }
+
+        const image = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        image.src = objectUrl;
+        image.onload = () => {
+            const maxSize = 900;
+            const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(image.width * scale);
+            canvas.height = Math.round(image.height * scale);
+            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(objectUrl);
+            const base64 = canvas.toDataURL('image/jpeg', 0.72);
+            if (base64.length > 900000) {
+                reject(new Error('La imagen sigue siendo demasiado grande. Usa una imagen más ligera.'));
+                return;
+            }
+            resolve(base64);
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            reject(new Error('No se pudo procesar la imagen.'));
+        };
+    });
 }
