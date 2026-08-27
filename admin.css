@@ -486,3 +486,5 @@ body { font-family: 'Outfit', sans-serif; background: var(--bg-dark); color: var
     background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 5px; font-size: 1.1rem;
 }
 .kb-card-actions .btn-delete:hover { color: var(--red); }
+.kb-card-actions .btn-cancellation { color: var(--red); }
+.kb-chip.cancellation-alert { flex-basis: 100%; border-color: var(--red); color: #ff8794; white-space: normal; }

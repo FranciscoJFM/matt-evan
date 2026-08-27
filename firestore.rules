@@ -11,7 +11,7 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'cliente', 'telefono', 'producto', 'estado', 'origen', 'folio',
           'categoria', 'total', 'anticipo', 'fechaEntrega', 'tipoEntrega',
-          'notas', 'items', 'archivo', 'creadoEn'
+          'notas', 'items', 'archivo', 'cancelacionToken', 'creadoEn'
         ])
         && request.resource.data.cliente is string
         && request.resource.data.cliente.size() >= 2
@@ -33,6 +33,8 @@ service cloud.firestore {
         && request.resource.data.items.size() <= 50
         && request.resource.data.archivo is string
         && request.resource.data.archivo.size() <= 500000
+        && request.resource.data.cancelacionToken is string
+        && request.resource.data.cancelacionToken.size() == 64
         && request.resource.data.estado == 'Nuevo'
         && request.resource.data.origen in ['Carrito web', 'Formulario web']
         && request.resource.data.folio is string
@@ -65,6 +67,33 @@ service cloud.firestore {
         && request.resource.data.actualizadoEn == request.time
       );
       allow update, delete: if isAdmin();
+    }
+
+    match /cancelaciones/{token} {
+      allow get: if token.size() == 64;
+      allow list: if isAdmin();
+      allow create: if isAdmin() || (
+        token.size() == 64
+        && request.resource.data.keys().hasOnly(['orderId','folio','estado','motivo','creadoEn'])
+        && request.resource.data.orderId is string
+        && request.resource.data.folio is string
+        && request.resource.data.estado == 'Disponible'
+        && request.resource.data.motivo == ''
+        && request.resource.data.creadoEn == request.time
+        && getAfter(/databases/$(database)/documents/encargos/$(request.resource.data.orderId)).data.cancelacionToken == token
+        && getAfter(/databases/$(database)/documents/encargos/$(request.resource.data.orderId)).data.folio == request.resource.data.folio
+      );
+      allow update: if isAdmin() || (
+        token.size() == 64
+        && resource.data.estado == 'Disponible'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado','motivo','solicitadaEn'])
+        && request.resource.data.estado == 'Solicitada'
+        && request.resource.data.motivo is string
+        && request.resource.data.motivo.size() >= 3
+        && request.resource.data.motivo.size() <= 300
+        && request.resource.data.solicitadaEn == request.time
+      );
+      allow delete: if isAdmin();
     }
 
     match /{collectionName}/{documentId} {

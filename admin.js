@@ -570,6 +570,7 @@ window.deleteCategory = async function(id) {
 //  ENCARGOS / PEDIDOS
 // ======================================================
 let allEncargos = [];
+let allCancellationRequests = [];
 document.getElementById('add-encargo-btn').addEventListener('click', () => showEncargoForm());
 document.getElementById('encargos-search')?.addEventListener('input', renderEncargos);
 document.getElementById('encargos-status-filter')?.addEventListener('change', renderEncargos);
@@ -617,7 +618,12 @@ async function completeOrderDelivery(orderId) {
 }
 
 async function loadEncargos() {
-    const snap = await getDocs(collection(db, "encargos"));
+    const [snap, cancellationsSnap] = await Promise.all([
+        getDocs(collection(db, "encargos")),
+        getDocs(collection(db, "cancelaciones"))
+    ]);
+    allCancellationRequests = [];
+    cancellationsSnap.forEach(item => allCancellationRequests.push({ id: item.id, ...item.data() }));
     allEncargos = [];
     snap.forEach(d => allEncargos.push({ id: d.id, ...d.data() }));
     await Promise.all(allEncargos.map(async order => {
@@ -630,7 +636,10 @@ async function loadEncargos() {
         order.pagadoCalculado = activePayments.length > 0
             ? historyTotal
             : Number(order.pagado ?? order.anticipo ?? 0);
-        order.saldoCalculado = Math.max(0, roundMoney(Number(order.total || order.precio || 0) - order.pagadoCalculado));
+        const effectiveTotal = normalizeOrderStatus(order.estado) === 'Cancelado' && order.cargoCancelacion != null
+            ? Number(order.cargoCancelacion) : Number(order.total || order.precio || 0);
+        order.saldoCalculado = Math.max(0, roundMoney(effectiveTotal - order.pagadoCalculado));
+        order.solicitudCancelacion = allCancellationRequests.find(request => request.orderId === order.id && request.estado === 'Solicitada');
     }));
     allEncargos.sort((a, b) => (b.creadoEn?.seconds || 0) - (a.creadoEn?.seconds || 0));
     await syncTrackingOrders(allEncargos);
@@ -647,7 +656,7 @@ async function syncTrackingOrders(orders) {
         folio: order.folio,
         estado: normalizeOrderStatus(order.estado),
         fechaEntrega: order.fechaEntrega || '',
-        total: Number(order.total || 0),
+        total: normalizeOrderStatus(order.estado) === 'Cancelado' && order.cargoCancelacion != null ? Number(order.cargoCancelacion) : Number(order.total || 0),
         pagado: Number(order.pagadoCalculado || 0),
         saldo: Number(order.saldoCalculado || 0),
         actualizadoEn: serverTimestamp()
@@ -755,7 +764,7 @@ function renderEncargos() {
         card.draggable = true;
         card.dataset.id = e.id;
         
-        const total = Number(e.total || e.precio || 0);
+        const total = status === 'Cancelado' && e.cargoCancelacion != null ? Number(e.cargoCancelacion) : Number(e.total || e.precio || 0);
         const paid = Number(e.pagadoCalculado || 0);
         const saldo = Math.max(0, roundMoney(total - paid));
         const paymentStatus = total > 0 && saldo === 0 ? 'Liquidado' : paid > 0 ? 'Pago parcial' : 'Sin anticipo';
@@ -773,12 +782,14 @@ function renderEncargos() {
                     ${e.categoria ? `<span class="kb-chip">${escapeHtml(getCategoryName(e.categoria))}</span>` : ''}
                     ${e.fechaEntrega ? `<span class="kb-chip ${isLate ? 'due-late' : ''}">📅 ${escapeHtml(e.fechaEntrega)}</span>` : ''}
                     ${e.proximoPago ? `<span class="kb-chip ${paymentOverdue ? 'due-late' : ''}">💳 Próximo pago: ${escapeHtml(e.proximoPago)}</span>` : ''}
+                    ${e.solicitudCancelacion ? `<span class="kb-chip cancellation-alert">⚠️ Cancelación solicitada: ${escapeHtml(e.solicitudCancelacion.motivo || '')}</span>` : ''}
                     ${total ? `<span class="kb-chip">Total: $${total.toLocaleString('es-MX')}</span><span class="kb-chip">Pagado: $${paid.toLocaleString('es-MX')}</span><span class="kb-chip ${saldo === 0 ? 'paid-off' : ''}">${paymentStatus}: $${saldo.toLocaleString('es-MX')}</span>` : ''}
                 </div>
             </div>
             <div class="kb-card-actions">
                 ${e.telefono ? `<button class="btn-whatsapp" onclick="contactEncargo('${e.id}')" title="Contactar por WhatsApp" aria-label="Contactar por WhatsApp"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
                 <button class="btn-payment" onclick="manageEncargoPayments('${e.id}')" title="Anticipos y abonos" aria-label="Administrar anticipos y abonos"><i class="fa-solid fa-wallet"></i></button>
+                ${e.solicitudCancelacion ? `<button class="btn-cancellation" onclick="resolveCancellation('${e.id}')" title="Resolver cancelación" aria-label="Resolver cancelación"><i class="fa-solid fa-ban"></i></button>` : ''}
                 ${e.archivo ? `<button onclick="openOrderFile('${e.id}')" title="Ver archivo del cliente" aria-label="Ver archivo del cliente"><i class="fa-solid fa-paperclip"></i></button>` : ''}
                 <button onclick="printEncargo('${e.id}')" title="Imprimir cotización" aria-label="Imprimir cotización"><i class="fa-solid fa-file-invoice-dollar"></i></button>
                 <button class="btn-edit" onclick="editEncargo('${e.id}')"><i class="fa-solid fa-pen"></i></button>
@@ -803,6 +814,42 @@ function renderEncargos() {
         if (!content.children.length) content.innerHTML = `<p class="empty-state" style="padding:10px;">Sin ${status.toLowerCase()}.</p>`;
     });
 }
+
+window.resolveCancellation = async function(orderId) {
+    const order = allEncargos.find(item => item.id === orderId);
+    const request = order?.solicitudCancelacion;
+    if (!order || !request) return;
+    const status = normalizeOrderStatus(order.estado);
+    const createdAt = order.creadoEn?.toDate ? order.creadoEn.toDate() : new Date(0);
+    const freeWindow = status === 'Nuevo' && Date.now() - createdAt.getTime() <= 10 * 60 * 1000;
+    const suggestedRate = freeWindow ? 0 : status === 'Produccion' ? 30 : status === 'Listo' ? 50 : 0;
+    const rateInput = prompt(`Porcentaje de cargo por cancelación (${status}). Sugerido: ${suggestedRate}%`, String(suggestedRate));
+    if (rateInput === null) return;
+    const rate = Math.min(100, Math.max(0, Number(rateInput)));
+    if (!Number.isFinite(rate)) { toast('Porcentaje inválido', true); return; }
+    const reason = prompt('Motivo o acuerdo final de cancelación:', request.motivo || '')?.trim();
+    if (!reason) return;
+    const fee = roundMoney(Number(order.total || 0) * rate / 100);
+    const paid = Number(order.pagadoCalculado || 0);
+    const refund = Math.max(0, roundMoney(paid - fee));
+    const amountDue = Math.max(0, roundMoney(fee - paid));
+    if (!confirm(`Cargo: $${fee.toLocaleString('es-MX')} · ${refund ? `Reembolso pendiente: $${refund.toLocaleString('es-MX')}` : `Saldo por cobrar: $${amountDue.toLocaleString('es-MX')}`}. ¿Confirmar cancelación?`)) return;
+    try {
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'encargos', orderId), {
+            estado: 'Cancelado', porcentajeCancelacion: rate, cargoCancelacion: fee,
+            reembolsoPendiente: refund, motivoCancelacion: reason,
+            canceladoEn: serverTimestamp(), actualizadoEn: serverTimestamp()
+        });
+        batch.update(doc(db, 'cancelaciones', request.id), {
+            estado: 'Resuelta', porcentaje: rate, cargo: fee, reembolso: refund,
+            resolucion: reason, resueltaEn: serverTimestamp()
+        });
+        await batch.commit();
+        toast('Pedido movido a Cancelados');
+        await loadEncargos(); updateDashboard();
+    } catch (error) { console.error(error); toast('No se pudo resolver la cancelación', true); }
+};
 
 // Configurar zonas para soltar
 let kanbanInitialized = false;
@@ -1163,6 +1210,7 @@ window.deleteEncargo = async function(id) {
         const order = allEncargos.find(item => item.id === id);
         const batch = writeBatch(db);
         (order?.pagos || []).forEach(payment => batch.delete(doc(db, "encargos", id, "pagos", payment.id)));
+        if (order?.cancelacionToken) batch.delete(doc(db, "cancelaciones", order.cancelacionToken));
         batch.delete(doc(db, "encargos", id));
         await batch.commit(); toast('Encargo eliminado 🗑️'); await loadEncargos();
     } catch (err) {

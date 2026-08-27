@@ -1482,6 +1482,10 @@ footer p {
 .my-order-card h4, .my-order-card p { margin: 0; }
 .my-order-card small { color: var(--text-muted); }
 .my-order-status { align-self: center; padding: 6px 12px; border: 1px solid var(--primary-cyan); border-radius: 999px; color: var(--primary-cyan); font-weight: 800; }
+.my-order-actions { display: flex; align-items: center; gap: 9px; grid-column: 1 / -1; }
+.my-order-actions button { padding: 7px 11px; border: 1px solid var(--glass-border); border-radius: 8px; background: rgba(0,0,0,.25); color: var(--text-main); cursor: pointer; }
+.my-order-actions .cancel-order-btn { border-color: #ff5468; color: #ff8b99; }
+.cancellation-requested { color: #ffd166; font-weight: 700; }
 .privacy-note { margin-top: 10px; color: var(--text-muted); font-size: .78rem; text-align: center; }
 .order-confirmation { margin-top: 12px; padding: 12px; border: 1px solid rgba(0,230,118,.45); border-radius: 10px; background: rgba(0,230,118,.1); color: #8dffbd !important; text-align: center; font-weight: 700; }
 

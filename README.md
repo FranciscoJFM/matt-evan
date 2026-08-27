@@ -25,6 +25,8 @@ Sitio público y panel administrativo para gestionar productos, categorías, ped
 - Entrega controlada: impide entregar con deuda salvo crédito autorizado y descuenta inventario una sola vez.
 - Agenda de entregas y cobros, historial por cliente y exportación CSV de pedidos y pagos.
 - Formulario público con archivo Base64 opcional y seguimiento por folio sin exponer los datos del cliente.
+- “Mis pedidos” en el dispositivo, con actualización de estado, opción de compartir y solicitud privada de cancelación.
+- Cancelaciones auditables con ventana gratuita de 10 minutos, cargo sugerido de 30% en producción y 50% al estar listo, además de cálculo de reembolso o saldo.
 - Configuración de WhatsApp y redes desde el administrador.
 - Imágenes comprimidas y guardadas como Base64 en Firestore, sin depender de Firebase Storage.
 

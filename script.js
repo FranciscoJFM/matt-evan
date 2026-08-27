@@ -1,6 +1,6 @@
 // Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, getDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // Firebase Config
 const firebaseConfig = {
@@ -27,9 +27,9 @@ function getMyOrders() {
     catch { return []; }
 }
 
-function rememberOrder(folio, cliente, telefono, producto) {
+function rememberOrder(folio, cliente, telefono, producto, cancelacionToken) {
     const orders = getMyOrders().filter(order => order.folio !== folio);
-    orders.unshift({ folio, cliente, telefono: String(telefono).replace(/\D/g, '').slice(-4), producto, registradoEn: new Date().toISOString() });
+    orders.unshift({ folio, cliente, telefono: String(telefono).replace(/\D/g, '').slice(-4), producto, cancelacionToken, registradoEn: new Date().toISOString() });
     localStorage.setItem(MY_ORDERS_KEY, JSON.stringify(orders.slice(0, 25)));
 }
 
@@ -41,20 +41,48 @@ async function renderMyOrders() {
     container.innerHTML = '<p class="empty-state">Actualizando tus pedidos...</p>';
     const results = await Promise.all(orders.map(async order => {
         try {
-            const snapshot = await getDoc(doc(db, 'seguimiento', order.folio));
-            return { ...order, tracking: snapshot.exists() ? snapshot.data() : null };
+            const [trackingSnapshot, cancellationSnapshot] = await Promise.all([
+                getDoc(doc(db, 'seguimiento', order.folio)),
+                order.cancelacionToken ? getDoc(doc(db, 'cancelaciones', order.cancelacionToken)) : Promise.resolve(null)
+            ]);
+            return { ...order, tracking: trackingSnapshot.exists() ? trackingSnapshot.data() : null, cancellation: cancellationSnapshot?.exists() ? cancellationSnapshot.data() : null };
         } catch { return { ...order, tracking: null }; }
     }));
     container.innerHTML = results.map(order => `<article class="my-order-card">
         <div><h4>${escapeHtml(order.folio)}</h4><p>${escapeHtml(order.producto || 'Pedido mattEvan')}</p><small>${escapeHtml(order.cliente || '')}${order.telefono ? ` · Tel. terminado en ${escapeHtml(order.telefono)}` : ''}</small></div>
         <span class="my-order-status">${escapeHtml(order.tracking?.estado || 'Sin conexión')}</span>
         <small>${order.tracking?.fechaEntrega ? `Entrega estimada: ${escapeHtml(order.tracking.fechaEntrega)} · ` : ''}Saldo: $${Number(order.tracking?.saldo || 0).toLocaleString('es-MX')}</small>
+        <div class="my-order-actions">
+            <button type="button" onclick="shareOrder('${escapeHtml(order.folio)}')">Compartir</button>
+            ${order.cancelacionToken && !['Entregado', 'Cancelado'].includes(order.tracking?.estado) && order.cancellation?.estado !== 'Solicitada' ? `<button type="button" class="cancel-order-btn" onclick="requestOrderCancellation('${escapeHtml(order.cancelacionToken)}')">Cancelar pedido</button>` : ''}
+            ${order.cancellation?.estado === 'Solicitada' ? '<span class="cancellation-requested">Cancelación solicitada</span>' : ''}
+        </div>
     </article>`).join('');
 }
+
+window.shareOrder = async function(folio) {
+    const text = `Consulta el pedido ${folio} de mattEvan en ${location.origin}${location.pathname}#order-status`;
+    try {
+        if (navigator.share) await navigator.share({ title: `Pedido ${folio}`, text });
+        else { await navigator.clipboard.writeText(text); showToast('Información del pedido copiada.'); }
+    } catch (error) { if (error.name !== 'AbortError') showToast('No se pudo compartir el pedido.'); }
+};
+
+window.requestOrderCancellation = async function(token) {
+    const reason = prompt('¿Por qué deseas cancelar el pedido?');
+    if (!reason?.trim()) return;
+    if (!confirm('Durante los primeros 10 minutos y en estado Nuevo la cancelación es gratuita. Después puede aplicar un cargo según el avance. ¿Enviar solicitud?')) return;
+    try {
+        await updateDoc(doc(db, 'cancelaciones', token), { estado: 'Solicitada', motivo: reason.trim().slice(0, 300), solicitadaEn: serverTimestamp() });
+        showToast('Solicitud de cancelación enviada.');
+        await renderMyOrders();
+    } catch (error) { console.error(error); showToast('No se pudo solicitar la cancelación.'); }
+};
 
 async function createEncargo(cliente, telefono, producto, origen, details = {}) {
     const folio = createOrderFolio();
     const reference = doc(collection(db, "encargos"));
+    const cancelacionToken = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
     const orderData = {
         cliente,
         telefono,
@@ -70,6 +98,7 @@ async function createEncargo(cliente, telefono, producto, origen, details = {}) 
         notas: details.notas || '',
         items: Array.isArray(details.items) ? details.items : [],
         archivo: details.archivo || '',
+        cancelacionToken,
         creadoEn: serverTimestamp()
     };
     const batch = writeBatch(db);
@@ -79,8 +108,11 @@ async function createEncargo(cliente, telefono, producto, origen, details = {}) 
         total: Number(details.total) || 0, pagado: 0, saldo: Number(details.total) || 0,
         actualizadoEn: serverTimestamp()
     });
+    batch.set(doc(db, 'cancelaciones', cancelacionToken), {
+        orderId: reference.id, folio, estado: 'Disponible', motivo: '', creadoEn: serverTimestamp()
+    });
     await batch.commit();
-    return { reference, folio };
+    return { reference, folio, cancelacionToken };
 }
 
 // Configuración por defecto (se sobreescribe con Firebase)
@@ -640,7 +672,7 @@ function setupCartModal() {
         sendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Registrando pedido...';
 
         try {
-            const { folio } = await createEncargo(cliente, telefono, producto, "Carrito web", {
+            const { folio, cancelacionToken } = await createEncargo(cliente, telefono, producto, "Carrito web", {
                 total,
                 categoria: cart.length === 1 ? cart[0].categoria : 'varios',
                 notas: comments,
@@ -648,7 +680,7 @@ function setupCartModal() {
                 tipoEntrega,
                 items: cart.map(item => ({ id: item.productId || item.id || '', nombre: item.nombre, variante: item.variante || '', precio: Number(item.precio), cantidad: Number(item.cantidad) }))
             });
-            rememberOrder(folio, cliente, telefono, producto);
+            rememberOrder(folio, cliente, telefono, producto, cancelacionToken);
             cart = [];
             saveCart();
             updateCartUI();
@@ -764,14 +796,14 @@ if (form) {
 
         try {
             const encodedFile = await readSmallOrderFile(orderFile);
-            const { folio } = await createEncargo(name, phone, `${service}: ${categoryDetails ? categoryDetails + '. ' : ''}${message}`, "Formulario web", {
+            const { folio, cancelacionToken } = await createEncargo(name, phone, `${service}: ${categoryDetails ? categoryDetails + '. ' : ''}${message}`, "Formulario web", {
                 categoria: service,
                 notas: `${categoryDetails ? categoryDetails + '. ' : ''}${message}`,
                 fechaEntrega: preferredDate,
                 tipoEntrega: deliveryType,
                 archivo: encodedFile
             });
-            rememberOrder(folio, name, phone, `${service}: ${message}`);
+            rememberOrder(folio, name, phone, `${service}: ${message}`, cancelacionToken);
             await renderMyOrders();
             if (whatsappWindow) {
                 whatsappWindow.opener = null;
