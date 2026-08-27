@@ -161,17 +161,17 @@ async function loadCatalog() {
                 <div class="product-info">
                     <h3>${prod.nombre}</h3>
                     ${priceHtml}
-                    <div style="display:flex; gap:8px; margin-top:10px;">
+                    <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
                         <button class="btn btn-primary product-add-cart"
                                 data-nombre="${prod.nombre}"
                                 data-precio="${prod.precio}"
-                                style="flex:1;">
+                                style="width:100%;">
                             🛒 Al Carrito
                         </button>
                         <button class="btn btn-secondary product-ask-wa"
                                 data-nombre="${prod.nombre}"
                                 data-precio="${prod.precio}"
-                                style="flex:1; white-space:nowrap;">
+                                style="width:100%;">
                             <i class="fa-brands fa-whatsapp"></i> Preguntar
                         </button>
                     </div>

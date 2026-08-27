@@ -454,38 +454,113 @@ let allEncargos = [];
 document.getElementById('add-encargo-btn').addEventListener('click', () => showEncargoForm());
 
 async function loadEncargos() {
-    const list = document.getElementById('admin-encargos-list');
-    list.innerHTML = '<p class="loading-text">Cargando encargos...</p>';
+    // Limpiar columnas
+    const colPendiente = document.querySelector('#kb-col-pendiente .kanban-col-content');
+    const colConseguido = document.querySelector('#kb-col-conseguido .kanban-col-content');
+    const colEntregado = document.querySelector('#kb-col-entregado .kanban-col-content');
+    const colCancelado = document.querySelector('#kb-col-cancelado .kanban-col-content');
+
+    if (colPendiente) colPendiente.innerHTML = '';
+    if (colConseguido) colConseguido.innerHTML = '';
+    if (colEntregado) colEntregado.innerHTML = '';
+    if (colCancelado) colCancelado.innerHTML = '';
+
     const snap = await getDocs(collection(db, "encargos"));
     allEncargos = [];
     snap.forEach(d => allEncargos.push({ id: d.id, ...d.data() }));
 
-    if (allEncargos.length === 0) {
-        list.innerHTML = '<p class="empty-state">No tienes encargos pendientes.</p>';
+    if (allEncargos.length === 0 && colPendiente) {
+        colPendiente.innerHTML = '<p class="empty-state" style="padding:10px;">Sin pedidos.</p>';
         return;
     }
 
-    list.innerHTML = allEncargos.map(e => {
-        let badgeClass = 'badge-disponible';
-        if (e.estado === 'Entregado') badgeClass = 'badge-apartado';
-        if (e.estado === 'Cancelado') badgeClass = 'badge-vendido';
-        if (e.estado === 'Conseguido') badgeClass = 'badge-disponible';
-
-        return `
-        <div class="list-item" style="${e.estado === 'Entregado' || e.estado === 'Cancelado' ? 'opacity:0.6' : ''}">
-            <div class="list-item-info">
+    allEncargos.forEach(e => {
+        const card = document.createElement('div');
+        card.className = 'kanban-card';
+        card.draggable = true;
+        card.dataset.id = e.id;
+        
+        card.innerHTML = `
+            <div class="kb-card-header">
                 <h4><i class="fa-solid fa-user"></i> ${e.cliente}</h4>
-                <p><strong>Pide:</strong> ${e.producto}</p>
-                <p>📞 ${e.telefono || 'Sin teléfono'}</p>
-                <span class="badge ${badgeClass}" style="margin-top:5px;display:inline-block">${e.estado || 'Pendiente'}</span>
+                <div class="kb-card-date">${e.telefono || 'Sin tel.'}</div>
             </div>
-            <div class="list-item-actions">
+            <div class="kb-card-body">
+                <p><strong>Pide:</strong> ${e.producto}</p>
+            </div>
+            <div class="kb-card-actions">
                 <button class="btn-edit" onclick="editEncargo('${e.id}')"><i class="fa-solid fa-pen"></i></button>
                 <button class="btn-delete" onclick="deleteEncargo('${e.id}')"><i class="fa-solid fa-trash"></i></button>
             </div>
-        </div>
         `;
-    }).join('');
+
+        // Eventos Drag and Drop para la tarjeta
+        card.addEventListener('dragstart', (evt) => {
+            card.classList.add('dragging');
+            evt.dataTransfer.setData('text/plain', e.id);
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('dragging');
+        });
+
+        // Insertar en la columna correcta
+        let estado = e.estado || 'Pendiente';
+        if (estado === 'Pendiente' && colPendiente) colPendiente.appendChild(card);
+        else if (estado === 'Conseguido' && colConseguido) colConseguido.appendChild(card);
+        else if (estado === 'Entregado' && colEntregado) colEntregado.appendChild(card);
+        else if (estado === 'Cancelado' && colCancelado) colCancelado.appendChild(card);
+        else if (colPendiente) colPendiente.appendChild(card); // Fallback
+    });
+
+    setupKanbanDropZones();
+}
+
+// Configurar zonas para soltar
+let kanbanInitialized = false;
+function setupKanbanDropZones() {
+    if (kanbanInitialized) return;
+    
+    document.querySelectorAll('.kanban-column').forEach(column => {
+        column.addEventListener('dragover', e => {
+            e.preventDefault();
+            column.classList.add('drag-over');
+        });
+
+        column.addEventListener('dragleave', () => {
+            column.classList.remove('drag-over');
+        });
+
+        column.addEventListener('drop', async e => {
+            e.preventDefault();
+            column.classList.remove('drag-over');
+            
+            const id = e.dataTransfer.getData('text/plain');
+            const newStatus = column.dataset.status;
+            
+            const card = document.querySelector(`.kanban-card[data-id="${id}"]`);
+            if (card) {
+                const contentArea = column.querySelector('.kanban-col-content');
+                contentArea.appendChild(card); // Mover visualmente primero
+                
+                // Actualizar en Firebase
+                try {
+                    await updateDoc(doc(db, "encargos", id), { estado: newStatus });
+                    
+                    // Actualizar estado en memoria
+                    const enc = allEncargos.find(x => x.id === id);
+                    if (enc) enc.estado = newStatus;
+                    
+                    toast('Estado actualizado a ' + newStatus);
+                } catch (err) {
+                    console.error(err);
+                    toast('Error al mover', true);
+                    loadEncargos(); // Revertir si falla
+                }
+            }
+        });
+    });
+    kanbanInitialized = true;
 }
 
 function showEncargoForm(encargo = null) {

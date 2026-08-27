@@ -148,14 +148,45 @@
                 </div>
             </section>
 
-            <!-- ===== SECCIÓN: ENCARGOS ===== -->
+            <!-- ===== SECCIÓN: ENCARGOS (KANBAN) ===== -->
             <section class="content-section" id="sec-encargos">
                 <div class="section-header">
-                    <h2>📋 Lista de Encargos / Pedidos</h2>
-                    <button class="btn-primary" id="add-encargo-btn"><i class="fa-solid fa-plus"></i> Nuevo Encargo</button>
+                    <h2>📋 Kanban de Pedidos / Encargos</h2>
+                    <button class="btn-primary" id="add-encargo-btn"><i class="fa-solid fa-plus"></i> Nuevo Pedido</button>
                 </div>
-                <div class="admin-grid" id="admin-encargos-list">
-                    <!-- Se llenará con JS -->
+                
+                <div class="kanban-board">
+                    <!-- Columna 1: Pendiente -->
+                    <div class="kanban-column" id="kb-col-pendiente" data-status="Pendiente">
+                        <div class="kanban-col-header">
+                            <h3>⏳ Pendientes</h3>
+                        </div>
+                        <div class="kanban-col-content"></div>
+                    </div>
+                    
+                    <!-- Columna 2: Conseguido -->
+                    <div class="kanban-column" id="kb-col-conseguido" data-status="Conseguido">
+                        <div class="kanban-col-header">
+                            <h3>📦 Conseguidos</h3>
+                        </div>
+                        <div class="kanban-col-content"></div>
+                    </div>
+                    
+                    <!-- Columna 3: Entregado -->
+                    <div class="kanban-column" id="kb-col-entregado" data-status="Entregado">
+                        <div class="kanban-col-header">
+                            <h3>✅ Entregados</h3>
+                        </div>
+                        <div class="kanban-col-content"></div>
+                    </div>
+
+                    <!-- Columna 4: Cancelado -->
+                    <div class="kanban-column" id="kb-col-cancelado" data-status="Cancelado">
+                        <div class="kanban-col-header" style="border-bottom-color: var(--danger-color);">
+                            <h3>🚫 Cancelados</h3>
+                        </div>
+                        <div class="kanban-col-content"></div>
+                    </div>
                 </div>
             </section>
 
