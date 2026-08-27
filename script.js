@@ -53,25 +53,39 @@ async function renderMyOrders() {
         <span class="my-order-status">${escapeHtml(order.tracking?.estado || 'Sin conexión')}</span>
         <small>${order.tracking?.fechaEntrega ? `Entrega estimada: ${escapeHtml(order.tracking.fechaEntrega)} · ` : ''}Saldo: $${Number(order.tracking?.saldo || 0).toLocaleString('es-MX')}</small>
         <div class="my-order-actions">
-            <button type="button" onclick="shareOrder('${escapeHtml(order.folio)}')">Compartir</button>
-            ${order.cancelacionToken && !['Entregado', 'Cancelado'].includes(order.tracking?.estado) && order.cancellation?.estado !== 'Solicitada' ? `<button type="button" class="cancel-order-btn" onclick="requestOrderCancellation('${escapeHtml(order.cancelacionToken)}')">Cancelar pedido</button>` : ''}
+            <button type="button" onclick="sharePage()">Recomendar página</button>
+            ${!['Entregado', 'Cancelado'].includes(order.tracking?.estado) && order.cancellation?.estado !== 'Solicitada' ? `<button type="button" class="cancel-order-btn" onclick="requestOrderCancellation('${escapeHtml(order.cancelacionToken || '')}', '${escapeHtml(order.folio)}')">Cancelar pedido</button>` : ''}
+            <button type="button" onclick="removeMyOrder('${escapeHtml(order.folio)}')">Quitar de la lista</button>
             ${order.cancellation?.estado === 'Solicitada' ? '<span class="cancellation-requested">Cancelación solicitada</span>' : ''}
         </div>
     </article>`).join('');
 }
 
-window.shareOrder = async function(folio) {
-    const text = `Consulta el pedido ${folio} de mattEvan en ${location.origin}${location.pathname}#order-status`;
+window.sharePage = async function() {
+    const url = `${location.origin}${location.pathname}`;
+    const text = `Te recomiendo mattEvan: productos personalizados, impresiones, papelería y artículos de garage. ${url}`;
     try {
-        if (navigator.share) await navigator.share({ title: `Pedido ${folio}`, text });
-        else { await navigator.clipboard.writeText(text); showToast('Información del pedido copiada.'); }
+        if (navigator.share) await navigator.share({ title: 'Conoce mattEvan', text, url });
+        else { await navigator.clipboard.writeText(text); showToast('Recomendación copiada.'); }
     } catch (error) { if (error.name !== 'AbortError') showToast('No se pudo compartir el pedido.'); }
 };
 
-window.requestOrderCancellation = async function(token) {
+window.removeMyOrder = async function(folio) {
+    if (!confirm('¿Quitar este pedido de la lista de este dispositivo? El pedido no se eliminará del negocio.')) return;
+    localStorage.setItem(MY_ORDERS_KEY, JSON.stringify(getMyOrders().filter(order => order.folio !== folio)));
+    await renderMyOrders();
+    showToast('Pedido quitado de tu lista.');
+};
+
+window.requestOrderCancellation = async function(token, folio) {
     const reason = prompt('¿Por qué deseas cancelar el pedido?');
     if (!reason?.trim()) return;
     if (!confirm('Durante los primeros 10 minutos y en estado Nuevo la cancelación es gratuita. Después puede aplicar un cargo según el avance. ¿Enviar solicitud?')) return;
+    if (!token) {
+        window.open(buildWhatsappUrl(`Hola mattEvan, solicito cancelar el pedido ${folio}. Motivo: ${reason.trim()}`), '_blank', 'noopener,noreferrer');
+        showToast('Solicitud abierta en WhatsApp.');
+        return;
+    }
     try {
         await updateDoc(doc(db, 'cancelaciones', token), { estado: 'Solicitada', motivo: reason.trim().slice(0, 300), solicitadaEn: serverTimestamp() });
         showToast('Solicitud de cancelación enviada.');
