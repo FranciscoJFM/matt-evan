@@ -52,6 +52,11 @@ function getCategoryName(slug) {
     return allCategories.find(category => category.slug === slug)?.nombre || slug || 'Sin categoría';
 }
 
+function isServiceEntry(item = {}) {
+    return item.tipo === 'Servicio'
+        || (!item.tipo && item.categoria === 'copias-impresiones-escaner');
+}
+
 const DEFAULT_CATEGORIES = [
     { nombre: 'Garage / Bazar', slug: 'garage', icono: '🏷️', descripcion: 'Productos nuevos, seminuevos y oportunidades de garage.', camposPedido: ['Cantidad', 'Forma de entrega'], activa: true },
     { nombre: 'Personalizados', slug: 'custom', icono: '🎨', descripcion: 'Tazas, playeras, stickers, gorras y artículos personalizados.', camposPedido: ['Producto', 'Cantidad', 'Color', 'Talla o medida'], activa: true },
@@ -189,7 +194,7 @@ async function loadProducts() {
         </div>` : '';
 
     list.innerHTML = historicoBanner + allProducts.map(p => {
-        const isService = p.tipo === 'Servicio';
+        const isService = isServiceEntry(p);
         const badgeClass = p.estado === 'Vendido' ? 'badge-vendido' : p.estado === 'Apartado' ? 'badge-apartado' : 'badge-disponible';
         const imgUrl = p.imagen || 'https://via.placeholder.com/300x200?text=Sin+Imagen';
         const soldStyle = p.estado === 'Vendido' ? 'opacity:0.5; filter:grayscale(80%);' : '';
@@ -228,6 +233,7 @@ async function loadProducts() {
 
 function showProductForm(product = null) {
     const isEdit = !!product;
+    const productIsService = isServiceEntry(product || {});
     if (!isEdit && allCategories.length === 0) {
         toast('Primero crea al menos una categoría', true);
         document.querySelector('[data-section="sec-categorias"]')?.click();
@@ -240,8 +246,8 @@ function showProductForm(product = null) {
     openModal(isEdit ? 'EDITAR PRODUCTO' : 'NUEVO PRODUCTO', `
         <form id="pf">
             <div class="form-group"><label>Tipo de publicación</label><select id="pf-type">
-                <option value="Producto" ${product?.tipo !== 'Servicio' ? 'selected' : ''}>Producto con stock</option>
-                <option value="Servicio" ${product?.tipo === 'Servicio' ? 'selected' : ''}>Servicio por cotizar</option>
+                <option value="Producto" ${!productIsService ? 'selected' : ''}>Producto con stock</option>
+                <option value="Servicio" ${productIsService ? 'selected' : ''}>Servicio por cotizar</option>
             </select></div>
             <div class="form-group"><label>Nombre</label><input type="text" id="pf-name" required value="${product?.nombre || ''}" placeholder="Ej. Camiseta Mattevan"></div>
             <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">

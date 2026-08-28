@@ -15,6 +15,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+function isServiceEntry(item = {}) {
+    return item.tipo === 'Servicio'
+        || (!item.tipo && item.categoria === 'copias-impresiones-escaner');
+}
+
 function createOrderFolio() {
     const day = new Date().toISOString().slice(0, 10).replaceAll('-', '');
     return `ME-${day}-${crypto.randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`;
@@ -280,7 +285,7 @@ async function loadCatalog() {
         }
 
         productos.forEach(prod => {
-            const isService = prod.tipo === 'Servicio';
+            const isService = isServiceEntry(prod);
             let badgeClass = 'badge-available';
             let estadoTexto = prod.estado || 'Disponible';
             if (estadoTexto === 'Vendido') badgeClass = 'badge-sold';
