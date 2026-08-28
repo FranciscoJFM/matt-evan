@@ -280,6 +280,7 @@ async function loadCatalog() {
         }
 
         productos.forEach(prod => {
+            const isService = prod.tipo === 'Servicio';
             let badgeClass = 'badge-available';
             let estadoTexto = prod.estado || 'Disponible';
             if (estadoTexto === 'Vendido') badgeClass = 'badge-sold';
@@ -291,23 +292,25 @@ async function loadCatalog() {
 
             const imgUrl = prod.imagen || 'https://via.placeholder.com/300x300?text=Sin+Imagen';
             const qty = prod.cantidad ?? 1;
-            const stockHtml = prod.estado === 'Apartado' ? '' :
+            const stockHtml = isService || prod.estado === 'Apartado' ? '' :
                 qty <= 2 ? `<span class="stock-warning">🔥 ¡Último${qty > 1 ? 's ' + qty : ''}!</span>` : '';
 
-            let priceHtml = `<p class="price">$${prod.precio} MXN</p>`;
+            let priceHtml = isService
+                ? (Number(prod.precio) > 0 ? `<p class="price"><span class="price-prefix">Desde</span> $${prod.precio} MXN</p>` : `<p class="service-quote-price">Precio según tu proyecto</p>`)
+                : `<p class="price">$${prod.precio} MXN</p>`;
             let discountBadge = '';
-            if (prod.precioViejo && prod.precioViejo > prod.precio) {
+            if (!isService && prod.precioViejo && prod.precioViejo > prod.precio) {
                 const discount = Math.round(((prod.precioViejo - prod.precio) / prod.precioViejo) * 100);
                 priceHtml = `<p class="price"><span class="old-price">$${prod.precioViejo}</span> $${prod.precio} MXN</p>`;
                 discountBadge = `<span class="discount-badge">-${discount}%</span>`;
             }
-            const activeVariants = (prod.variantes || []).filter(variant => Number(variant.stock) > 0);
+            const activeVariants = isService ? [] : (prod.variantes || []).filter(variant => Number(variant.stock) > 0);
             const variantsHtml = activeVariants.length ? `<select class="product-variant-select" aria-label="Seleccionar variante de ${escapeHtml(prod.nombre)}">${activeVariants.map((variant, index) => `<option value="${index}" data-name="${escapeHtml(variant.nombre)}" data-extra="${Number(variant.precioExtra) || 0}" data-stock="${Number(variant.stock)}">${escapeHtml(variant.nombre)}${Number(variant.precioExtra) ? ` (+$${Number(variant.precioExtra)})` : ''} · ${Number(variant.stock)} disponibles</option>`).join('')}</select>` : '';
 
             card.innerHTML = `
                 <div class="product-image-container">
                     <img src="${escapeHtml(imgUrl)}" alt="${escapeHtml(prod.nombre)}" class="product-img" loading="lazy" decoding="async">
-                    <span class="status ${badgeClass}">${escapeHtml(estadoTexto)}</span>
+                    <span class="status ${isService ? 'badge-service' : badgeClass}">${isService ? 'Servicio' : escapeHtml(estadoTexto)}</span>
                     ${stockHtml}
                     ${discountBadge}
                 </div>
@@ -317,7 +320,13 @@ async function loadCatalog() {
                     ${priceHtml}
                     ${variantsHtml}
                     <div style="display:flex; flex-direction:column; gap:8px; margin-top:10px;">
-                        <button class="btn btn-primary product-add-cart"
+                        ${isService ? `<a class="btn btn-primary service-quote-btn"
+                                href="#contact"
+                                data-service="${escapeHtml(prod.nombre)}"
+                                data-category="${escapeHtml(prod.categoria || '')}"
+                                style="width:100%;">
+                            Solicitar cotización
+                        </a>` : `<button class="btn btn-primary product-add-cart"
                                 data-nombre="${escapeHtml(prod.nombre)}"
                                 data-precio="${prod.precio}"
                                 data-id="${prod.id}"
@@ -325,10 +334,11 @@ async function loadCatalog() {
                                 data-categoria="${escapeHtml(prod.categoria || '')}"
                                 style="width:100%;">
                             🛒 Agregar al pedido
-                        </button>
+                        </button>`}
                         <button class="btn btn-secondary product-ask-wa"
                                 data-nombre="${escapeHtml(prod.nombre)}"
                                 data-precio="${prod.precio}"
+                                data-service="${isService}"
                                 style="width:100%;">
                             <i class="fa-brands fa-whatsapp"></i> Preguntar
                         </button>
@@ -518,6 +528,18 @@ function saveCart() {
 }
 
 function setupProductCTAs() {
+    $$(".service-quote-btn").forEach(button => {
+        button.addEventListener("click", () => {
+            const serviceSelect = document.getElementById('service');
+            if (serviceSelect && publicCategories.some(category => category.slug === button.dataset.category)) {
+                serviceSelect.value = button.dataset.category;
+                renderDynamicOrderFields();
+            }
+            const message = document.getElementById('message');
+            if (message && !message.value.trim()) message.value = `Me interesa: ${button.dataset.service}`;
+        });
+    });
+
     // Botón: Añadir al carrito
     $$(".product-add-cart").forEach(button => {
         const nombre = button.dataset.nombre;
@@ -558,7 +580,10 @@ function setupProductCTAs() {
         button.addEventListener("click", () => {
             const nombre = button.dataset.nombre;
             const precio = button.dataset.precio;
-            const text = `Hola, vi el *${nombre}* de $${precio} en mattEvan. ¿Todavía está disponible?`;
+            const isService = button.dataset.service === 'true';
+            const text = isService
+                ? `Hola, me interesa el servicio de *${nombre}*. ¿Me ayudan con una cotización?`
+                : `Hola, vi el *${nombre}* de $${precio} en mattEvan. ¿Todavía está disponible?`;
             window.open(buildWhatsappUrl(text), "_blank", "noopener,noreferrer");
         });
     });

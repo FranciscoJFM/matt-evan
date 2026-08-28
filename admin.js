@@ -189,16 +189,21 @@ async function loadProducts() {
         </div>` : '';
 
     list.innerHTML = historicoBanner + allProducts.map(p => {
+        const isService = p.tipo === 'Servicio';
         const badgeClass = p.estado === 'Vendido' ? 'badge-vendido' : p.estado === 'Apartado' ? 'badge-apartado' : 'badge-disponible';
         const imgUrl = p.imagen || 'https://via.placeholder.com/300x200?text=Sin+Imagen';
         const soldStyle = p.estado === 'Vendido' ? 'opacity:0.5; filter:grayscale(80%);' : '';
         const qty = p.cantidad ?? 1;
-        const stockLabel = p.estado === 'Vendido' ? '' :
+        const stockLabel = isService || p.estado === 'Vendido' ? '' :
             qty <= 0 ? `<span class="stock-badge agotado">⚠️ Agotado</span>` :
             qty <= 2 ? `<span class="stock-badge pocas">🔥 ${qty} restante${qty > 1 ? 's' : ''}</span>` :
             `<span class="stock-badge normal">📦 Stock: ${qty}</span>`;
             
-        const priceHtml = p.precioViejo 
+        const priceHtml = isService && !Number(p.precio)
+            ? `<p class="price">Precio por cotizar</p>`
+            : isService
+            ? `<p class="price">Desde $${p.precio} MXN</p>`
+            : p.precioViejo
             ? `<p class="price"><span class="old-price">$${p.precioViejo}</span> $${p.precio} MXN</p>`
             : `<p class="price">$${p.precio} MXN</p>`;
 
@@ -206,7 +211,7 @@ async function loadProducts() {
         <div class="product-card" style="${soldStyle}">
             <img src="${imgUrl}" alt="${p.nombre}">
             <div class="product-card-body">
-                <span class="badge ${badgeClass}">${p.estado || 'Disponible'}</span>
+                <span class="badge ${badgeClass}">${isService ? 'Servicio' : (p.estado || 'Disponible')}</span>
                 ${stockLabel}
                 <h3>${p.nombre}</h3>
                 ${priceHtml}
@@ -234,9 +239,13 @@ function showProductForm(product = null) {
 
     openModal(isEdit ? 'EDITAR PRODUCTO' : 'NUEVO PRODUCTO', `
         <form id="pf">
+            <div class="form-group"><label>Tipo de publicación</label><select id="pf-type">
+                <option value="Producto" ${product?.tipo !== 'Servicio' ? 'selected' : ''}>Producto con stock</option>
+                <option value="Servicio" ${product?.tipo === 'Servicio' ? 'selected' : ''}>Servicio por cotizar</option>
+            </select></div>
             <div class="form-group"><label>Nombre</label><input type="text" id="pf-name" required value="${product?.nombre || ''}" placeholder="Ej. Camiseta Mattevan"></div>
             <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
-                <div class="form-group"><label>Precio de Oferta (MXN)</label><input type="number" id="pf-price" required value="${product?.precio || ''}" placeholder="250"></div>
+                <div class="form-group"><label id="pf-price-label">Precio de Oferta (MXN)</label><input type="number" id="pf-price" min="0" value="${product?.precio ?? ''}" placeholder="250"></div>
                 <div class="form-group"><label>Precio Original (Opcional)</label><input type="number" id="pf-price-old" value="${product?.precioViejo || ''}" placeholder="350"></div>
                 <div class="form-group"><label>Cantidad (Stock)</label><input type="number" id="pf-qty" min="0" value="${product?.cantidad ?? 1}" placeholder="1"></div>
             </div>
@@ -258,6 +267,18 @@ function showProductForm(product = null) {
         </form>
     `);
 
+    const syncProductTypeFields = () => {
+        const isService = document.getElementById('pf-type').value === 'Servicio';
+        document.getElementById('pf-price-label').textContent = isService ? 'Precio desde (opcional)' : 'Precio de Oferta (MXN)';
+        document.getElementById('pf-price').required = !isService;
+        document.getElementById('pf-price-old').closest('.form-group').hidden = isService;
+        document.getElementById('pf-qty').closest('.form-group').hidden = isService;
+        document.getElementById('pf-status').closest('.form-group').hidden = isService;
+        document.getElementById('pf-variants').closest('.form-group').hidden = isService;
+    };
+    document.getElementById('pf-type').addEventListener('change', syncProductTypeFields);
+    syncProductTypeFields();
+
     document.getElementById('pf').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btn = e.target.querySelector('button[type=submit]');
@@ -265,15 +286,18 @@ function showProductForm(product = null) {
 
         try {
             const oldPriceVal = document.getElementById('pf-price-old').value;
+            const tipo = document.getElementById('pf-type').value;
+            const isService = tipo === 'Servicio';
             const data = {
+                tipo,
                 nombre: document.getElementById('pf-name').value,
-                precio: Number(document.getElementById('pf-price').value),
-                precioViejo: oldPriceVal ? Number(oldPriceVal) : null,
-                cantidad: document.getElementById('pf-qty').value === '' ? 1 : Math.max(0, Number(document.getElementById('pf-qty').value)),
+                precio: Number(document.getElementById('pf-price').value) || 0,
+                precioViejo: !isService && oldPriceVal ? Number(oldPriceVal) : null,
+                cantidad: isService ? 1 : (document.getElementById('pf-qty').value === '' ? 1 : Math.max(0, Number(document.getElementById('pf-qty').value))),
                 categoria: document.getElementById('pf-cat').value,
-                estado: document.getElementById('pf-status').value,
+                estado: isService ? 'Disponible' : document.getElementById('pf-status').value,
                 descripcion: document.getElementById('pf-desc').value,
-                variantes: document.getElementById('pf-variants').value.split('\n').map(line => {
+                variantes: isService ? [] : document.getElementById('pf-variants').value.split('\n').map(line => {
                     const [nombre, precioExtra, stock] = line.split('|').map(value => value?.trim());
                     return { nombre, precioExtra: Number(precioExtra) || 0, stock: Math.max(0, Number(stock) || 0) };
                 }).filter(variant => variant.nombre),

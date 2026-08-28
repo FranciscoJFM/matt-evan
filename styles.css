@@ -628,6 +628,39 @@ body {
     padding: 25px;
 }
 
+.badge-service {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    color: #fff;
+    background: linear-gradient(90deg, var(--primary-purple), var(--primary-pink));
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.price-prefix {
+    font-size: 0.75em;
+    color: var(--text-muted);
+    -webkit-text-fill-color: var(--text-muted);
+}
+
+.service-quote-price {
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.service-quote-btn {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    text-decoration: none;
+}
+
 .product-info h3 {
     font-size: 1.3rem;
     margin-bottom: 10px;
